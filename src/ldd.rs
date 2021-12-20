@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::cmp::Ordering;
 
 // List Decision Diagrams, abbreviated LDD, are data structures that represent sets of fixed length vectors. 
 // An LDD represents a set as follows. Given an LDD n then [[n]] is defined as:
@@ -33,22 +34,22 @@ impl Storage
     {
         let mut library = Self { 
             index: HashMap::new(),
-            table: Vec::new(),
+            table: vec![
+                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
+                Node{
+                    value: 0,
+                    down: 0,
+                    right: 0,
+                },
+                Node{
+                    value: 0,
+                    down: 0,
+                    right: 0,
+                }
+            ],
             height: Vec::new(),
         };
-
-        // Add two nodes representing 'false' and 'true' respectively; these cannot be created using make_node.
-        library.table.push(Node{
-            value: 0,
-            down: 0,
-            right: 0,
-        });
-        library.table.push(Node{
-            value: 0,
-            down: 0,
-            right: 0,
-        });
-
+       
         // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
         library.height.push(0);
         library.height.push(0);
@@ -101,9 +102,10 @@ impl Storage
         self.table[ldd].value
     }
 
-    fn get(&self, ldd: Ldd) -> &Node
+    fn get(&self, ldd: Ldd) -> (u64, Ldd, Ldd)
     {
-        &self.table[ldd]
+        let node = &self.table[ldd];
+        (node.value, node.down, node.right)
     }
 }
 
@@ -117,6 +119,37 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     }
 
     root
+}
+
+// Returns the union of the given LDDs.
+pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
+{
+    if a == b {
+        a
+    } else if a == storage.empty_set() {
+        b
+    } else if b == storage.empty_set() {
+        a
+    } else {
+        let (a_value, a_down, a_right) = storage.get(a);
+        let (b_value, b_down, b_right) = storage.get(b);
+
+        match a_value.cmp(&b_value) {
+            Ordering::Less => {
+                let result = union(storage, a_right, b);
+                storage.insert(a_value, a_down, result)
+            },
+            Ordering::Equal => {
+                let down_result = union(storage, a_down, b_down);
+                let right_result = union(storage, a_right, b_right);
+                storage.insert(a_value, down_result, right_result)
+            },
+            Ordering::Greater => {
+                let result = union(storage, a, b_right);
+                storage.insert(b_value, b_down, result)
+            }
+        }
+    }
 }
 
 // Return a formatter for the given Ldd.
@@ -135,23 +168,55 @@ pub struct Display<'a>
     ldd: Ldd,
 }
 
-fn print(storage: &Storage, ldd: Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
+fn print(storage: &Storage, cache: &mut Vec<u64>, ldd: Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
 {
     if ldd == storage.empty_set() {
-        return write!(f, "")
-    } else if ldd == storage.empty_vector() {
-        return write!(f, "]")
+        Ok(())
+    } 
+    else if ldd == storage.empty_vector() 
+    {
+        // Here, we have found another vector in the LDD.
+        write!(f, "<")?;
+        for val in cache
+        {
+            write!(f, "{} ", val)?;
+        }
+        write!(f, ">\n")
     }
+    else
+    {
+        // Loop over all nodes on this level
+        let mut current = ldd;
 
-    write!(f, "{}", storage.value(ldd))
+        loop
+        {
+            let (value, down, right) = storage.get(current);
+
+            cache.push(value);
+            print(storage, cache, down, f)?;
+            cache.pop();
+
+            if right == storage.empty_set()
+            {
+                break
+            }
+            else
+            {
+                current = right;
+            }
+        }
+        Ok(())        
+    }
 }
 
 impl fmt::Display for Display<'_>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
-        write!(f, "{{ <");
-        print(self.storage, self.ldd, f);
-        write!(f, "> }}")
+        let mut cache: Vec<u64> = Vec::new();
+
+        write!(f, "{{ ")?;
+        print(self.storage, &mut cache, self.ldd, f)?;
+        write!(f, "}}")
     }
 }
