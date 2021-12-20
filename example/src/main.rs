@@ -1,4 +1,4 @@
-mod ldd;
+extern crate ldd;
 
 fn main() {
 
@@ -9,5 +9,5 @@ fn main() {
     let b = ldd::singleton(&mut storage, &[0, 4, 2, 1, 8]);
     let result = ldd::union(&mut storage, a, b);
 
-    println! ("A {}", ldd::fmt_node(&storage, result))
+    println! ("result {}", ldd::fmt_node(&storage, result))
 }
