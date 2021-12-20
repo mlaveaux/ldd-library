@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage};
+use crate::{Ldd, Storage, Data};
 
 use std::cmp::Ordering;
 
@@ -24,8 +24,8 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == storage.empty_set() {
         a
     } else {
-        let (a_value, a_down, a_right) = storage.get(a);
-        let (b_value, b_down, b_right) = storage.get(b);
+        let Data(a_value, a_down, a_right) = storage.get(a);
+        let Data(b_value, b_down, b_right) = storage.get(b);
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
@@ -45,6 +45,40 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     }
 }
 
+struct Iter<'a>
+{
+    storage: &'a Storage,
+    current: Ldd,
+}
+
+fn iter(storage: &Storage, ldd: Ldd) -> Iter
+{
+    Iter {
+        storage,
+        current: ldd,
+    }
+}
+
+impl Iterator for Iter<'_>
+{
+    type Item = Data;
+
+    fn next(&mut self) -> Option<Self::Item>
+    {             
+        if self.current == self.storage.empty_set()
+        {
+            None
+        }
+        else
+        {
+            // Progress to the right LDD.
+            let Data(value, down, right) = self.storage.get(self.current);       
+            self.current = right;
+            Some(Data(value, down, right))
+        }
+    }
+}
+
 // Returns true iff the given vector is included in the LDD.
 pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
 {
@@ -58,24 +92,15 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
     }
     else
     {
-        // Loop over all nodes on this level
-        let mut current = ldd;
-        loop
-        {        
-            let (value, down, right) = storage.get(current);
-            if value == vector[0]
-            {
-                break element_of(storage, &vector[1..], down)
-            }
-    
-            if right == storage.empty_set()
-            {
-                break false
-            }
-            else
-            {
-                current = right;
+        for Data(value, down, _) in iter(&storage, ldd)
+        {            
+            if value == vector[0] {
+                return element_of(storage, &vector[1..], down)
+            } else if value > vector[0] {
+                return false
             }
         }
+
+        false
     }    
 }

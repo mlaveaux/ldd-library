@@ -1,6 +1,4 @@
-
-use crate::Ldd;
-use crate::Storage;
+use crate::{Ldd, Storage, Data};
 
 use std::fmt;
 
@@ -42,7 +40,7 @@ fn print(storage: &Storage, cache: &mut Vec<u64>, ldd: Ldd, f: &mut fmt::Formatt
 
         loop
         {
-            let (value, down, right) = storage.get(current);
+            let Data(value, down, right) = storage.get(current);
 
             cache.push(value);
             print(storage, cache, down, f)?;

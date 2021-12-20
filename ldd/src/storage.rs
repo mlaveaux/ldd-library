@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::Ldd;
 
+
 // This is the LDD node(value, down, right)
 #[derive(PartialEq, Eq, Hash)]
 struct Node
@@ -9,6 +10,9 @@ struct Node
     down: Ldd,
     right: Ldd
 }
+
+// This is only the user-facing data of a Node.
+pub struct Data(pub u64, pub Ldd, pub Ldd);
 
 // The storage that implements the maximal sharing behaviour. Meaning that identical nodes (same value, down and right) have a unique index in the node table. Therefore Ldds n and m are identical iff their indices match.
 pub struct Storage
@@ -92,9 +96,9 @@ impl Storage
         self.table[ldd].value
     }
 
-    pub fn get(&self, ldd: Ldd) -> (u64, Ldd, Ldd)
+    pub fn get(&self, ldd: Ldd) -> Data
     {
         let node = &self.table[ldd];
-        (node.value, node.down, node.right)
+        Data(node.value, node.down, node.right)
     }
 }
