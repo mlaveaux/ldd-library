@@ -44,3 +44,38 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
         }
     }
 }
+
+// Returns true iff the given vector is included in the LDD.
+pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
+{
+    if vector.len() == 0
+    {
+        ldd == storage.empty_vector()
+    }
+    else if ldd == storage.empty_vector()
+    {
+        false
+    }
+    else
+    {
+        // Loop over all nodes on this level
+        let mut current = ldd;
+        loop
+        {        
+            let (value, down, right) = storage.get(current);
+            if value == vector[0]
+            {
+                break element_of(storage, &vector[1..], down)
+            }
+    
+            if right == storage.empty_set()
+            {
+                break false
+            }
+            else
+            {
+                current = right;
+            }
+        }
+    }    
+}
