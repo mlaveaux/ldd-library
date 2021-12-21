@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data};
+use crate::{Ldd, Storage, Data, iterators::*};
 
 use std::cmp::Ordering;
 
@@ -45,40 +45,6 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     }
 }
 
-struct Iter<'a>
-{
-    storage: &'a Storage,
-    current: Ldd,
-}
-
-fn iter(storage: &Storage, ldd: Ldd) -> Iter
-{
-    Iter {
-        storage,
-        current: ldd,
-    }
-}
-
-impl Iterator for Iter<'_>
-{
-    type Item = Data;
-
-    fn next(&mut self) -> Option<Self::Item>
-    {             
-        if self.current == self.storage.empty_set()
-        {
-            None
-        }
-        else
-        {
-            // Progress to the right LDD.
-            let Data(value, down, right) = self.storage.get(self.current);       
-            self.current = right;
-            Some(Data(value, down, right))
-        }
-    }
-}
-
 // Returns true iff the given vector is included in the LDD.
 pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
 {
@@ -92,7 +58,7 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
     }
     else
     {
-        for Data(value, down, _) in iter(&storage, ldd)
+        for Data(value, down, _) in iter_right(&storage, ldd)
         {            
             if value == vector[0] {
                 return element_of(storage, &vector[1..], down)

@@ -1,6 +1,4 @@
-use crate::Ldd;
-use crate::storage::Storage;
-use crate::operations::*;
+use crate::{Ldd, storage::Storage, operations::*, iterators::*};
 
 use std::collections::HashSet;
 use rand::Rng;
@@ -101,5 +99,29 @@ fn random_union()
     for expected in set_a.union(&set_b)
     {
         assert!(element_of(&storage, &expected, result));
+    }
+
+    for vector in iter(&storage, result)
+    {
+        assert!(set_a.contains(&vector) || set_b.contains(&vector));
+    }
+}
+
+// Test the iterator implementation.
+#[test]
+fn random_iter()
+{
+    let mut storage = Storage::new();
+
+    let set = random_vector_set(32, 10);
+    let ldd = from_hashset(&mut storage, &set);
+
+    // Check that the number of iterations matches the number of elements in the set.
+    assert!(iter(&storage, ldd).count() == set.len());
+
+    // Every iterated element must be in the set.
+    for vector in iter(&storage, ldd)
+    {
+        assert!(set.contains(&vector));
     }
 }

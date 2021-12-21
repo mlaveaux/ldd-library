@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data};
+use crate::{Ldd, Storage, iterators::*};
 
 use std::fmt;
 
@@ -20,43 +20,18 @@ pub struct Display<'a>
 
 fn print(storage: &Storage, cache: &mut Vec<u64>, ldd: Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
 {
-    if ldd == storage.empty_set() {
-        Ok(())
-    } 
-    else if ldd == storage.empty_vector() 
+    for vector in iter(storage, ldd) 
     {
         // Here, we have found another vector in the LDD.
         write!(f, "<")?;
-        for val in cache
+        for val in vector
         {
             write!(f, "{} ", val)?;
         }
-        write!(f, ">\n")
+        write!(f, ">\n")?;
     }
-    else
-    {
-        // Loop over all nodes on this level
-        let mut current = ldd;
 
-        loop
-        {
-            let Data(value, down, right) = storage.get(current);
-
-            cache.push(value);
-            print(storage, cache, down, f)?;
-            cache.pop();
-
-            if right == storage.empty_set()
-            {
-                break
-            }
-            else
-            {
-                current = right;
-            }
-        }
-        Ok(())        
-    }
+    Ok(())
 }
 
 impl fmt::Display for Display<'_>
