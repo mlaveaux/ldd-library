@@ -18,7 +18,7 @@ pub struct Display<'a>
     ldd: Ldd,
 }
 
-fn print(storage: &Storage, cache: &mut Vec<u64>, ldd: Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
+fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
 {
     for vector in iter(storage, ldd) 
     {
@@ -38,10 +38,8 @@ impl fmt::Display for Display<'_>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
-        let mut cache: Vec<u64> = Vec::new();
-
         write!(f, "{{ \n")?;
-        print(self.storage, &mut cache, self.ldd, f)?;
+        print(self.storage, &self.ldd, f)?;
         write!(f, "}}")
     }
 }
