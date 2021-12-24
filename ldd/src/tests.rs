@@ -58,28 +58,28 @@ fn random_element_of()
     // All elements in the set should be contained in the ldd.
     for expected in &set
     {
-        assert!(element_of(&storage, &expected, ldd));
+        assert!(element_of(&storage, &expected, &ldd));
     }
 
     // No shorter vectors should be contained in the ldd (try several times).
     for _ in 1..10
     {
         let short_vector = random_vector(rng.gen_range(0..length));
-        assert!(!element_of(&storage, &short_vector, ldd));
+        assert!(!element_of(&storage, &short_vector, &ldd));
     }
 
     // No longer vectors should be contained in the ldd.
     for _ in 1..10
     {
         let short_vector = random_vector(rng.gen_range(length+1..20));
-        assert!(!element_of(&storage, &short_vector, ldd));
+        assert!(!element_of(&storage, &short_vector, &ldd));
     }
 
     // Try vectors of correct size with both the set and ldd.
     for _ in 1..10
     {
         let vector = random_vector(length);
-        assert_eq!(set.contains(&vector), element_of(&storage, &vector, ldd));
+        assert_eq!(set.contains(&vector), element_of(&storage, &vector, &ldd));
     }
 }
 
@@ -98,10 +98,10 @@ fn random_union()
 
     for expected in set_a.union(&set_b)
     {
-        assert!(element_of(&storage, &expected, result));
+        assert!(element_of(&storage, &expected, &result));
     }
 
-    for vector in iter(&storage, result)
+    for vector in iter(&storage, &result)
     {
         assert!(set_a.contains(&vector) || set_b.contains(&vector));
     }
@@ -117,10 +117,10 @@ fn random_iter()
     let ldd = from_hashset(&mut storage, &set);
 
     // Check that the number of iterations matches the number of elements in the set.
-    assert!(iter(&storage, ldd).count() == set.len());
+    assert!(iter(&storage, &ldd).count() == set.len());
 
     // Every iterated element must be in the set.
-    for vector in iter(&storage, ldd)
+    for vector in iter(&storage, &ldd)
     {
         assert!(set.contains(&vector));
     }

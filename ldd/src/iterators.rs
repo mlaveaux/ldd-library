@@ -1,18 +1,18 @@
 use crate::{Ldd, Storage, Data};
 
 // Returns an iterator over all right siblings of the given LDD.
-pub fn iter_right(storage: &Storage, ldd: Ldd) -> IterRight
+pub fn iter_right<'a>(storage: &'a Storage, ldd: &Ldd) -> IterRight<'a>
 {
     IterRight {
         storage,
-        current: ldd,
+        current: ldd.clone(),
     }
 }
 
 // Returns an iterator over all vectors contained in the given LDD.
-pub fn iter(storage: &Storage, ldd: Ldd) -> Iter
+pub fn iter<'a>(storage: &'a Storage, ldd: &Ldd) -> Iter<'a>
 {       
-    if ldd == storage.empty_set() {        
+    if *ldd == storage.empty_set() {        
         Iter {
             storage,
             vector: Vec::new(),
@@ -22,7 +22,7 @@ pub fn iter(storage: &Storage, ldd: Ldd) -> Iter
         Iter {
             storage,
             vector: Vec::new(),
-            stack: vec![ldd],
+            stack: vec![ldd.clone()],
         }
     }
 }
@@ -46,8 +46,8 @@ impl Iterator for IterRight<'_>
         else
         {
             // Progress to the right LDD.
-            let Data(value, down, right) = self.storage.get(self.current);       
-            self.current = right;
+            let Data(value, down, right) = self.storage.get(&self.current);       
+            self.current = right.clone();
             Some(Data(value, down, right))
         }
     }
@@ -75,7 +75,7 @@ impl Iterator for Iter<'_>
                 None => return None,
             };
 
-            let Data(value, down, _) = self.storage.get(*current);
+            let Data(value, down, _) = self.storage.get(current);
             self.vector.push(value);
             if down == self.storage.empty_vector()
             {
@@ -97,7 +97,7 @@ impl Iterator for Iter<'_>
             };
 
             self.vector.pop();
-            let Data(_, _, right) = self.storage.get(current);
+            let Data(_, _, right) = self.storage.get(&current);
 
             if right != self.storage.empty_set()
             {

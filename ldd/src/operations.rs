@@ -24,8 +24,8 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == storage.empty_set() {
         a
     } else {
-        let Data(a_value, a_down, a_right) = storage.get(a);
-        let Data(b_value, b_down, b_right) = storage.get(b);
+        let Data(a_value, a_down, a_right) = storage.get(&a);
+        let Data(b_value, b_down, b_right) = storage.get(&b);
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
@@ -46,13 +46,13 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
 }
 
 // Returns true iff the given vector is included in the LDD.
-pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
+pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 {
     if vector.len() == 0
     {
-        ldd == storage.empty_vector()
+        *ldd == storage.empty_vector()
     }
-    else if ldd == storage.empty_vector()
+    else if *ldd == storage.empty_vector()
     {
         false
     }
@@ -61,7 +61,7 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: Ldd) -> bool
         for Data(value, down, _) in iter_right(&storage, ldd)
         {            
             if value == vector[0] {
-                return element_of(storage, &vector[1..], down)
+                return element_of(storage, &vector[1..], &down)
             } else if value > vector[0] {
                 return false
             }

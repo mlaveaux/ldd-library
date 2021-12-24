@@ -1,6 +1,27 @@
 use std::collections::HashMap;
-use crate::Ldd;
 
+// Every LDD points to its root node by means of an index.
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct Ldd
+{
+    index: usize,
+}
+
+impl Ldd
+{
+    fn new(index: usize) -> Ldd
+    {
+        Ldd { index }
+    }
+}
+
+impl Clone for Ldd
+{
+    fn clone(&self) -> Self
+    {
+        Ldd { index: self.index, }
+    }
+}
 
 // This is the LDD node(value, down, right)
 #[derive(PartialEq, Eq, Hash)]
@@ -32,13 +53,13 @@ impl Storage
                  // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
                 Node{
                     value: 0,
-                    down: 0,
-                    right: 0,
+                    down: Ldd::new(0),
+                    right: Ldd::new(0),
                 },
                 Node{
                     value: 0,
-                    down: 0,
-                    right: 0,
+                    down: Ldd::new(0),
+                    right: Ldd::new(0),
                 }
             ],
             height: Vec::new(),
@@ -57,48 +78,56 @@ impl Storage
         // Check the validity of the down and right nodes.
         assert_ne!(down, self.empty_set());
         assert_ne!(right, self.empty_vector());
-        assert!(down < self.table.len());
-        assert!(right < self.table.len());
+        assert!(down.index < self.table.len());
+        assert!(right.index < self.table.len());
 
         if right != self.empty_set()
         {
             // Check that our height matches the right LDD.
-            assert_eq!(self.height[down] + 1, self.height[right]);
+            assert_eq!(self.height[down.index] + 1, self.height[right.index]);
             // Check that our value is less then the right value.
-            assert!(value < self.value(right));
+            assert!(value < self.value(&right));
         }
 
-        let new_node = Node {value, down, right};
-        *self.index.entry(new_node).or_insert_with(
+        let new_node = Node {value, down: down.clone(), right: right.clone()};
+        Ldd
+        {
+            index: *self.index.entry(new_node).or_insert_with(
             || 
             {
-                self.table.push(Node {value, down, right});
-                self.height.push(self.height[down] + 1);
+                self.table.push(Node 
+                    {
+                        value, 
+                        down: Ldd::new(down.index), 
+                        right: Ldd::new(right.index),
+                    });
+                self.height.push(self.height[down.index] + 1);
                 self.table.len() - 1
             }
-        )
+            )
+        }
     }
 
     // The 'false' LDD.
     pub fn empty_set(&self) -> Ldd
     {
-        return 0
+        Ldd::new(0)
     }
 
     // The 'true' LDD.
     pub fn empty_vector(&self) -> Ldd
     {
-        return 1
+        Ldd::new(1)
     }
 
-    pub fn value(&self, ldd: Ldd) -> u64
+    pub fn value(&self, ldd: &Ldd) -> u64
     {
-        self.table[ldd].value
+        self.table[ldd.index].value
     }
 
-    pub fn get(&self, ldd: Ldd) -> Data
+    pub fn get(&self, ldd: &Ldd) -> Data
     {
-        let node = &self.table[ldd];
-        Data(node.value, node.down, node.right)
+        let node = &self.table[ldd.index];
+        Data(node.value, node.down.clone(), node.right.clone())
     }
 }
