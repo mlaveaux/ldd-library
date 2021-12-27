@@ -140,4 +140,18 @@ mod tests
             assert!(set_a.contains(&vector) || set_b.contains(&vector));
         }
     }
+
+    
+    #[test]
+    fn random_singleton()
+    {
+        let mut storage = Storage::new();
+        let vector = random_vector(10);
+
+        let ldd = singleton(&mut storage, &vector[..]);
+
+        // Check that ldd contains exactly vector that is equal to the vector.
+        let result = iter(&storage, &ldd).next().unwrap();
+        assert_eq!(vector, result);
+    }
 }
