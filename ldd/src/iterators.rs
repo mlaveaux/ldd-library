@@ -109,3 +109,29 @@ impl Iterator for Iter<'_>
         Some(vector)
     }
 }
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;    
+    use crate::common::*;
+    
+    // Test the iterator implementation.
+    #[test]
+    fn random_iter()
+    {
+        let mut storage = Storage::new();
+
+        let set = random_vector_set(32, 10);
+        let ldd = from_hashset(&mut storage, &set);
+
+        // Check that the number of iterations matches the number of elements in the set.
+        assert!(iter(&storage, &ldd).count() == set.len());
+
+        // Every iterated element must be in the set.
+        for vector in iter(&storage, &ldd)
+        {
+            assert!(set.contains(&vector));
+        }
+    }
+}
