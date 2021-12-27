@@ -13,7 +13,7 @@ pub fn random_vector(length: u64) -> Vec<u64>
 {
     let mut rng = rand::thread_rng();    
     let mut vector: Vec<u64> = Vec::new();
-    for _ in 1..length
+    for _ in 0..length
     {
         vector.push(rng.gen());
     }
@@ -28,7 +28,7 @@ pub fn random_vector_set(amount: u64, length: u64) ->  HashSet<Vec<u64>>
     let mut result: HashSet<Vec<u64>> = HashSet::new();
 
     // Insert 'amount' number of vectors into the result.
-    for _ in 1..amount
+    for _ in 0..amount
     {
         result.insert(random_vector(length));
     }

@@ -96,21 +96,21 @@ mod tests
         }
 
         // No shorter vectors should be contained in the ldd (try several times).
-        for _ in 1..10
+        for _ in 0..10
         {
             let short_vector = random_vector(rng.gen_range(0..length));
             assert!(!element_of(&storage, &short_vector, &ldd));
         }
 
         // No longer vectors should be contained in the ldd.
-        for _ in 1..10
+        for _ in 0..10
         {
             let short_vector = random_vector(rng.gen_range(length+1..20));
             assert!(!element_of(&storage, &short_vector, &ldd));
         }
 
         // Try vectors of correct size with both the set and ldd.
-        for _ in 1..10
+        for _ in 0..10
         {
             let vector = random_vector(length);
             assert_eq!(set.contains(&vector), element_of(&storage, &vector, &ldd));
