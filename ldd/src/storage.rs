@@ -1,17 +1,23 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
+use std::fmt::{self, Debug, Formatter};
+use std::hash::{Hash, Hasher};
 
-// Every LDD points to its root node by means of an index.
-#[derive(PartialEq, Eq, Hash, Debug)]
+// Every LDD points to its root node by means of an index and it has the shared storage for the protection.
 pub struct Ldd
 {
     index: usize,
+    storage: Rc<RefCell<SharedStorage>>,
 }
 
 impl Ldd
 {
-    fn new(index: usize) -> Ldd
+    fn new(storage: &Rc<RefCell<SharedStorage>>, index: usize) -> Ldd
     {
-        Ldd { index }
+        let result = Ldd { storage: Rc::clone(storage), index };
+        storage.borrow_mut().protect(&result);
+        result
     }
 }
 
@@ -19,60 +25,123 @@ impl Clone for Ldd
 {
     fn clone(&self) -> Self
     {
-        Ldd { index: self.index, }
+        self.storage.borrow_mut().protect(self);
+        Ldd::new(&self.storage, self.index)
     }
 }
 
-// This is the LDD node(value, down, right)
-#[derive(PartialEq, Eq, Hash)]
+impl Drop for Ldd
+{
+    fn drop(&mut self)
+    {
+        self.storage.borrow_mut().unprotect(self);
+    }
+}
+
+impl PartialEq for Ldd
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.index == other.index
+    }
+}
+
+impl Debug for Ldd
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result
+    {
+        write!(f, "index: {}", self.index)
+    }
+}
+
+impl Eq for Ldd {}
+
+impl Hash for Ldd
+{    
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
+// This is the LDD node(value, down, right) with a reference counter.
 struct Node
 {
     value: u64,
-    down: Ldd,
-    right: Ldd
+    down: usize,
+    right: usize,
+    reference_count: u64,
+}
+
+impl PartialEq for Node
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.value == other.value && self.down == other.down && self.right == other.right
+    }
+}
+
+impl Eq for Node {}
+
+impl Hash for Node
+{    
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+        self.down.hash(state);
+        self.right.hash(state);
+    }
+}
+
+impl Node
+{
+    fn new(value: u64, down: usize, right: usize) -> Node
+    {
+        Node {value, down, right, reference_count: 1}
+    }
 }
 
 // This is only the user-facing data of a Node.
 pub struct Data(pub u64, pub Ldd, pub Ldd);
 
-// The storage that implements the maximal sharing behaviour. Meaning that identical nodes (same value, down and right) have a unique index in the node table. Therefore Ldds n and m are identical iff their indices match.
+// The storage that implements the maximal sharing behaviour. Meaning that
+// identical nodes (same value, down and right) have a unique index in the node
+// table. Therefore Ldds n and m are identical iff their indices match.
 pub struct Storage
 {
+    shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
     index: HashMap<Node, usize>,
-    table: Vec<Node>,
     height: Vec<u64>,
     empty_set: Ldd,
     empty_vector: Ldd,
+}
+
+// Gives every node shared access to the underlying table.
+pub struct SharedStorage
+{    
+    table: Vec<Node>,
 }
 
 impl Storage
 {
     pub fn new() -> Self
     {
-        let mut library = Self { 
+        let shared = Rc::new(RefCell::new(SharedStorage { table: vec![] }));
+        let vector = vec![
+                // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
+                Node::new(0, 0, 0),
+                Node::new(0, 0, 0),
+            ];
+
+        shared.borrow_mut().table = vector;
+
+        let library = Self { 
             index: HashMap::new(),
-            table: vec![
-                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
-                Node{
-                    value: 0,
-                    down: Ldd::new(0),
-                    right: Ldd::new(0),
-                },
-                Node{
-                    value: 0,
-                    down: Ldd::new(0),
-                    right: Ldd::new(0),
-                }
-            ],
-            height: Vec::new(),
-            empty_set: Ldd::new(0),
-            empty_vector: Ldd::new(1),
+            shared: shared.clone(),
+            // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
+            height: vec![0, 0],
+            empty_set: Ldd::new(&shared, 0),
+            empty_vector: Ldd::new(&shared, 1),
         };
-       
-        // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
-        library.height.push(0);
-        library.height.push(0);
-        
+               
         library
     }
 
@@ -81,9 +150,9 @@ impl Storage
     {
         // Check the validity of the down and right nodes.
         assert_ne!(down, *self.empty_set());
-        assert_ne!(right, *self.empty_vector());
-        assert!(down.index < self.table.len());
-        assert!(right.index < self.table.len());
+        assert_ne!(right, *self.empty_vector()); 
+        assert!(down.index < self.shared.borrow().table.len());
+        assert!(right.index < self.shared.borrow().table.len());
 
         if right != *self.empty_set()
         {
@@ -93,23 +162,29 @@ impl Storage
             assert!(value < self.value(&right));
         }
 
-        let new_node = Node {value, down: down.clone(), right: right.clone()};
-        Ldd
-        {
-            index: *self.index.entry(new_node).or_insert_with(
+        let new_node = Node::new(value, down.index, right.index);
+        Ldd::new(&self.shared,
+            *self.index.entry(new_node).or_insert_with(
             || 
             {
-                self.table.push(Node 
-                    {
-                        value, 
-                        down: Ldd::new(down.index), 
-                        right: Ldd::new(right.index),
-                    });
+                let node = Node::new(value, down.index, right.index);
+                self.shared.borrow_mut().table.push(node);
                 self.height.push(self.height[down.index] + 1);
-                self.table.len() - 1
+                self.shared.borrow().table.len() - 1
             }
             )
-        }
+        )
+    }
+
+    pub fn garbage_collect(&mut self)
+    {
+        /*for node in enumerate(&self.shared.borrow_mut().table[..])
+        {
+            if node.reference_count == 0
+            {
+                println!("Node {} is garbage", )
+            }
+        }*/
     }
 
     // The 'false' LDD.
@@ -126,12 +201,31 @@ impl Storage
 
     pub fn value(&self, ldd: &Ldd) -> u64
     {
-        self.table[ldd.index].value
+        self.shared.borrow().table[ldd.index].value
     }
 
     pub fn get(&self, ldd: &Ldd) -> Data
     {
-        let node = &self.table[ldd.index];
-        Data(node.value, node.down.clone(), node.right.clone())
+        let data : (u64, usize, usize);
+        {        
+            let node = &self.shared.borrow().table[ldd.index];
+            data = (node.value, node.down, node.right);
+        }
+
+        Data(data.0, Ldd::new(&self.shared, data.1), Ldd::new(&self.shared, data.2))
+    }
+}
+
+impl SharedStorage
+{
+    // Protect the given ldd to prevent garbage collection.
+    fn protect(&mut self, ldd: &Ldd)
+    {
+        self.table[ldd.index].reference_count += 1
+    }
+    
+    fn unprotect(&mut self, ldd: &Ldd)
+    {
+        self.table[ldd.index].reference_count -= 1
     }
 }

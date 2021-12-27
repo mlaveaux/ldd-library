@@ -84,7 +84,7 @@ impl Iterator for Iter<'_>
             }
             else 
             {
-                self.stack.push(down);
+                self.stack.push(down.clone());
             }
         }
 
@@ -101,7 +101,7 @@ impl Iterator for Iter<'_>
 
             if right != *self.storage.empty_set()
             {
-                self.stack.push(right); // This is the first right sibling.
+                self.stack.push(right.clone()); // This is the first right sibling.
                 break;
             }           
         }

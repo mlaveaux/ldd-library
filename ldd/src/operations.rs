@@ -29,17 +29,17 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
-                let result = union(storage, a_right, b);
-                storage.insert(a_value, a_down, result)
+                let result = union(storage, a_right.clone(), b);
+                storage.insert(a_value, a_down.clone(), result)
             },
             Ordering::Equal => {
-                let down_result = union(storage, a_down, b_down);
-                let right_result = union(storage, a_right, b_right);
+                let down_result = union(storage, a_down.clone(), b_down.clone());
+                let right_result = union(storage, a_right.clone(), b_right.clone());
                 storage.insert(a_value, down_result, right_result)
             },
             Ordering::Greater => {
-                let result = union(storage, a, b_right);
-                storage.insert(b_value, b_down, result)
+                let result = union(storage, a, b_right.clone());
+                storage.insert(b_value, b_down.clone(), result)
             }
         }
     }
@@ -61,9 +61,9 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
         for Data(value, down, _) in iter_right(&storage, ldd)
         {            
             if value == vector[0] {
-                return element_of(storage, &vector[1..], &down)
+                return element_of(storage, &vector[1..], &down);
             } else if value > vector[0] {
-                return false
+                return false;
             }
         }
 
