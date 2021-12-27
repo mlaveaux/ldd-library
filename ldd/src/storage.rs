@@ -25,7 +25,6 @@ impl Clone for Ldd
 {
     fn clone(&self) -> Self
     {
-        self.storage.borrow_mut().protect(self);
         Ldd::new(&self.storage, self.index)
     }
 }
@@ -63,7 +62,9 @@ struct Node
     value: u64,
     down: usize,
     right: usize,
+
     reference_count: u64,
+    marked: bool,
 }
 
 impl PartialEq for Node
@@ -89,7 +90,7 @@ impl Node
 {
     fn new(value: u64, down: usize, right: usize) -> Node
     {
-        Node {value, down, right, reference_count: 0}
+        Node {value, down, right, reference_count: 0, marked: false}
     }
 }
 
@@ -103,9 +104,12 @@ pub struct Storage
 {
     shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
     index: HashMap<Node, usize>,
-    height: Vec<u64>,
+    free: Vec<usize>, // A list of free nodes.
     empty_set: Ldd,
     empty_vector: Ldd,
+    
+    height: Vec<u64>, // Used for debugging to ensure that the created LDDs are valid.
+    //reference_count_changes: u64, // The number of times reference counters are changed.
 }
 
 // Gives every node shared access to the underlying table.
@@ -113,6 +117,9 @@ pub struct SharedStorage
 {    
     table: Vec<Node>,
 }
+
+const EMPTY_SET: usize = 0;
+const EMPTY_VECTOR: usize = 1;
 
 impl Storage
 {
@@ -131,24 +138,25 @@ impl Storage
             index: HashMap::new(),
             shared: shared.clone(),
             // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
+            free: vec![],
             height: vec![0, 0],
-            empty_set: Ldd::new(&shared, 0),
-            empty_vector: Ldd::new(&shared, 1),
+            empty_set: Ldd::new(&shared, EMPTY_SET),
+            empty_vector: Ldd::new(&shared, EMPTY_VECTOR),
         };
                
         library
     }
 
     // Create a new node(value, down, right)
-    pub fn insert(&mut self, value: u64, down: Ldd, right: Ldd) -> Ldd
+    pub fn insert(&mut self, value: u64, down: &Ldd, right: &Ldd) -> Ldd
     {
         // Check the validity of the down and right nodes.
-        assert_ne!(down, *self.empty_set());
-        assert_ne!(right, *self.empty_vector()); 
+        assert_ne!(down, self.empty_set());
+        assert_ne!(right, self.empty_vector()); 
         assert!(down.index < self.shared.borrow().table.len());
         assert!(right.index < self.shared.borrow().table.len());
 
-        if right != *self.empty_set()
+        if right != self.empty_set()
         {
             // Check that our height matches the right LDD.
             assert_eq!(self.height[down.index] + 1, self.height[right.index]);
@@ -162,23 +170,98 @@ impl Storage
             || 
             {
                 let node = Node::new(value, down.index, right.index);
-                self.shared.borrow_mut().table.push(node);
-                self.height.push(self.height[down.index] + 1);
-                self.shared.borrow().table.len() - 1
+
+                match self.free.pop()
+                {
+                    Some(index) => {
+                        // Reuse existing position in table.
+                        self.shared.borrow_mut().table[index] = node;
+                        self.height[index] = self.height[down.index] + 1;
+                        index
+                    }
+                    None => {
+                        // No free positions so insert new.
+                        self.shared.borrow_mut().table.push(node);
+                        self.height.push(self.height[down.index] + 1);
+                        self.shared.borrow().table.len() - 1
+                    }
+                }
             }
             )
         )
     }
 
+    fn mark_node(&mut self, root: usize)
+    {
+        let table = &mut self.shared.borrow_mut().table;
+        let mut stack: Vec<usize> = vec![root];
+
+        loop
+        {
+            let current = match stack.pop() {
+                Some(x) => x,
+                None => break,
+            };
+            
+            let node = &mut table[current];
+            if node.marked
+            {
+                continue
+            }
+            else
+            {
+                node.marked = true;
+                stack.push(node.down);
+                stack.push(node.right);
+            }
+        }
+    }
+
     pub fn garbage_collect(&mut self)
     {
-        /*for node in enumerate(&self.shared.borrow_mut().table[..])
+        let mut roots: Vec<usize> = vec![];
+
+        // Mark all nodes that are (indirect) children of nodes with positive reference count.
+        for (index, node) in &mut self.shared.borrow_mut().table.iter_mut().enumerate()
         {
-            if node.reference_count == 0
+            if node.reference_count > 0
             {
-                println!("Node {} is garbage", )
+                roots.push(index);
             }
-        }*/
+        }
+
+        for root in roots.iter()
+        {
+            self.mark_node(*root);
+        }
+        
+        // Collect all garbage.
+        for (index, node) in &mut self.shared.borrow_mut().table.iter_mut().enumerate()
+        {
+            if node.marked
+            {
+                node.marked = false
+            }
+            else
+            {
+                self.free.push(index);
+
+                // Insert garbage values so an error is produced when it is used.
+                node.value = 0;
+                node.down = 0;
+                node.right = 0;
+            }
+        }        
+
+        // Check that freed nodes do not occur in any other LDD.
+        for garbage in self.free.iter()
+        {
+            for node in self.shared.borrow().table.iter()
+            {
+                assert_ne!(node.down, *garbage);
+                assert_ne!(node.right, *garbage);
+            }
+        }
     }
 
     // The 'false' LDD.
@@ -203,6 +286,10 @@ impl Storage
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
+            // Ensure that this node is valid as garbage collection will insert garbage values.
+            assert_ne!(node.down, EMPTY_SET);
+            assert_ne!(node.right, EMPTY_VECTOR); 
+
             data = (node.value, node.down, node.right);
         }
 
@@ -218,8 +305,37 @@ impl SharedStorage
         self.table[ldd.index].reference_count += 1
     }
     
+    // Remove protection from the given LDD.
     fn unprotect(&mut self, ldd: &Ldd)
     {
         self.table[ldd.index].reference_count -= 1
+    }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+    use crate::common::*;
+    use crate::operations::singleton;
+
+    #[test]
+    fn test_garbage_collection()
+    {
+        let mut storage = Storage::new();
+
+        let _child: Ldd;
+        {
+            // Make sure that this set goes out of scope, but keep a reference to some child ldd.
+            //let set = random_vector_set(1, 10);
+            //let ldd = from_hashset(&mut storage, &set);
+            let vector = random_vector(10);
+            let ldd = singleton(&mut storage, &vector);
+
+            _child = storage.get(&ldd).1;
+            storage.garbage_collect();
+        }
+
+        storage.garbage_collect();
     }
 }

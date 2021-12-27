@@ -6,9 +6,10 @@ use std::cmp::Ordering;
 pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 {
     let mut root = storage.empty_vector().clone();
+    let empty_set = storage.empty_set().clone();
     for val in vector.iter().rev()
     {
-        root = storage.insert(*val, root, storage.empty_set().clone());
+        root = storage.insert(*val, &root, &empty_set);
     }
 
     root
@@ -30,16 +31,16 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
         match a_value.cmp(&b_value) {
             Ordering::Less => {
                 let result = union(storage, a_right.clone(), b);
-                storage.insert(a_value, a_down.clone(), result)
+                storage.insert(a_value, &a_down, &result)
             },
             Ordering::Equal => {
                 let down_result = union(storage, a_down.clone(), b_down.clone());
                 let right_result = union(storage, a_right.clone(), b_right.clone());
-                storage.insert(a_value, down_result, right_result)
+                storage.insert(a_value, &down_result, &right_result)
             },
             Ordering::Greater => {
                 let result = union(storage, a, b_right.clone());
-                storage.insert(b_value, b_down.clone(), result)
+                storage.insert(b_value, &b_down, &result)
             }
         }
     }
@@ -140,8 +141,8 @@ mod tests
             assert!(set_a.contains(&vector) || set_b.contains(&vector));
         }
     }
-
     
+    // Compare the singleton implementation of union with a random vector used as input.
     #[test]
     fn random_singleton()
     {
