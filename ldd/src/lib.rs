@@ -11,5 +11,3 @@ mod iterators;
 pub use storage::*;
 pub use operations::*;
 pub use format::*;
-
-mod tests;
