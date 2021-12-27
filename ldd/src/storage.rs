@@ -42,6 +42,7 @@ impl PartialEq for Ldd
 {
     fn eq(&self, other: &Self) -> bool
     {
+        assert!(Rc::ptr_eq(&self.storage, &other.storage)); // Both LDDs should refer to the same storage.
         self.index == other.index
     }
 }
@@ -55,13 +56,6 @@ impl Debug for Ldd
 }
 
 impl Eq for Ldd {}
-
-impl Hash for Ldd
-{    
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index.hash(state);
-    }
-}
 
 // This is the LDD node(value, down, right) with a reference counter.
 struct Node
@@ -95,7 +89,7 @@ impl Node
 {
     fn new(value: u64, down: usize, right: usize) -> Node
     {
-        Node {value, down, right, reference_count: 1}
+        Node {value, down, right, reference_count: 0}
     }
 }
 
