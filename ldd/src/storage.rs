@@ -41,6 +41,8 @@ pub struct Storage
     index: HashMap<Node, usize>,
     table: Vec<Node>,
     height: Vec<u64>,
+    empty_set: Ldd,
+    empty_vector: Ldd,
 }
 
 impl Storage
@@ -63,6 +65,8 @@ impl Storage
                 }
             ],
             height: Vec::new(),
+            empty_set: Ldd::new(0),
+            empty_vector: Ldd::new(1),
         };
        
         // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
@@ -76,12 +80,12 @@ impl Storage
     pub fn insert(&mut self, value: u64, down: Ldd, right: Ldd) -> Ldd
     {
         // Check the validity of the down and right nodes.
-        assert_ne!(down, self.empty_set());
-        assert_ne!(right, self.empty_vector());
+        assert_ne!(down, *self.empty_set());
+        assert_ne!(right, *self.empty_vector());
         assert!(down.index < self.table.len());
         assert!(right.index < self.table.len());
 
-        if right != self.empty_set()
+        if right != *self.empty_set()
         {
             // Check that our height matches the right LDD.
             assert_eq!(self.height[down.index] + 1, self.height[right.index]);
@@ -109,15 +113,15 @@ impl Storage
     }
 
     // The 'false' LDD.
-    pub fn empty_set(&self) -> Ldd
+    pub fn empty_set(&self) -> &Ldd
     {
-        Ldd::new(0)
+        &self.empty_set
     }
 
     // The 'true' LDD.
-    pub fn empty_vector(&self) -> Ldd
+    pub fn empty_vector(&self) -> &Ldd
     {
-        Ldd::new(1)
+        &self.empty_vector
     }
 
     pub fn value(&self, ldd: &Ldd) -> u64

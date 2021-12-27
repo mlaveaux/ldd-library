@@ -5,10 +5,10 @@ use std::cmp::Ordering;
 // Returns an LDD containing only the given vector, i.e., { vector }
 pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 {
-    let mut root = storage.empty_vector();
+    let mut root = storage.empty_vector().clone();
     for val in vector.iter().rev()
     {
-        root = storage.insert(*val, root, storage.empty_set());
+        root = storage.insert(*val, root, storage.empty_set().clone());
     }
 
     root
@@ -19,9 +19,9 @@ pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
 {
     if a == b {
         a
-    } else if a == storage.empty_set() {
+    } else if a == *storage.empty_set() {
         b
-    } else if b == storage.empty_set() {
+    } else if b == *storage.empty_set() {
         a
     } else {
         let Data(a_value, a_down, a_right) = storage.get(&a);
@@ -50,9 +50,9 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 {
     if vector.len() == 0
     {
-        *ldd == storage.empty_vector()
+        *ldd == *storage.empty_vector()
     }
-    else if *ldd == storage.empty_vector()
+    else if *ldd == *storage.empty_vector()
     {
         false
     }

@@ -12,7 +12,7 @@ pub fn iter_right<'a>(storage: &'a Storage, ldd: &Ldd) -> IterRight<'a>
 // Returns an iterator over all vectors contained in the given LDD.
 pub fn iter<'a>(storage: &'a Storage, ldd: &Ldd) -> Iter<'a>
 {       
-    if *ldd == storage.empty_set() {        
+    if ldd == storage.empty_set() {        
         Iter {
             storage,
             vector: Vec::new(),
@@ -39,7 +39,7 @@ impl Iterator for IterRight<'_>
 
     fn next(&mut self) -> Option<Self::Item>
     {             
-        if self.current == self.storage.empty_set()
+        if self.current == *self.storage.empty_set()
         {
             None
         }
@@ -77,7 +77,7 @@ impl Iterator for Iter<'_>
 
             let Data(value, down, _) = self.storage.get(current);
             self.vector.push(value);
-            if down == self.storage.empty_vector()
+            if down == *self.storage.empty_vector()
             {
                 vector = self.vector.clone();
                 break; // Stop iteration.
@@ -99,7 +99,7 @@ impl Iterator for Iter<'_>
             self.vector.pop();
             let Data(_, _, right) = self.storage.get(&current);
 
-            if right != self.storage.empty_set()
+            if right != *self.storage.empty_set()
             {
                 self.stack.push(right); // This is the first right sibling.
                 break;
