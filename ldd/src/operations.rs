@@ -16,30 +16,30 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 }
 
 // Returns the union of the given LDDs.
-pub fn union(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
+pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
     if a == b {
-        a
-    } else if a == *storage.empty_set() {
-        b
-    } else if b == *storage.empty_set() {
-        a
+        a.clone()
+    } else if a == storage.empty_set() {
+        b.clone()
+    } else if b == storage.empty_set() {
+        a.clone()
     } else {
         let Data(a_value, a_down, a_right) = storage.get(&a);
         let Data(b_value, b_down, b_right) = storage.get(&b);
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
-                let result = union(storage, a_right.clone(), b);
+                let result = union(storage, &a_right, b);
                 storage.insert(a_value, &a_down, &result)
             },
             Ordering::Equal => {
-                let down_result = union(storage, a_down.clone(), b_down.clone());
-                let right_result = union(storage, a_right.clone(), b_right.clone());
+                let down_result = union(storage, &a_down, &b_down);
+                let right_result = union(storage, &a_right, &b_right);
                 storage.insert(a_value, &down_result, &right_result)
             },
             Ordering::Greater => {
-                let result = union(storage, a, b_right.clone());
+                let result = union(storage, a, &b_right);
                 storage.insert(b_value, &b_down, &result)
             }
         }
