@@ -1,13 +1,23 @@
-extern crate ldd;
+use std::env;
+use std::process;
 
-fn main() {
+use example::{run, Config};
 
-    // Initialize the library.
-    let mut storage = ldd::Storage::new();
+fn main()
+{
+    let args: Vec<String> = env::args().collect();
 
-    let a = ldd::singleton(&mut storage, &[0, 1, 2, 3, 4]);
-    let b = ldd::singleton(&mut storage, &[0, 4, 2, 1, 8]);
-    let result = ldd::union(&mut storage, a, b);
+    let config = Config::new(&args).unwrap_or_else(
+        |err| 
+        { 
+            eprintln!("Problem parsing input: {}", err); 
+            process::exit(-1); 
+        }
+    );
 
-    println! ("result {}", ldd::fmt_node(&storage, result))
+    if let Err(err) = run(&config)
+    {
+        eprintln!("Problem parsing input: {}", err); 
+        process::exit(-1);
+    }
 }
