@@ -9,6 +9,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>>
     let mut storage = ldd::Storage::new();
 
     let (initial_state, transitions) = sylvan_io::load_model(&mut storage, &config.filename)?;
+
     let mut todo = initial_state.clone();
 
     while todo != *storage.empty_set()
