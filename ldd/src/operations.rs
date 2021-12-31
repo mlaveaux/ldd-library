@@ -109,7 +109,7 @@ mod tests
 
         let length = 10;
         let set = random_vector_set(32, length);
-        let ldd = from_hashset(&mut storage, &set);
+        let ldd = from_iter(&mut storage, set.iter());
         
         // All elements in the set should be contained in the ldd.
         for expected in &set
@@ -148,8 +148,8 @@ mod tests
         let set_a = random_vector_set(32, 10);
         let set_b = random_vector_set(32, 10);
 
-        let a = from_hashset(&mut storage, &set_a);
-        let b = from_hashset(&mut storage, &set_b);
+        let a = from_iter(&mut storage, set_a.iter());
+        let b = from_iter(&mut storage, set_b.iter());
         let result = union(&mut storage, &a, &b);
 
         for expected in set_a.union(&set_b)
@@ -184,7 +184,7 @@ mod tests
         let mut storage = Storage::new();
 
         let set = random_vector_set(32, 10);
-        let ldd = from_hashset(&mut storage, &set);
+        let ldd = from_iter(&mut storage, set.iter());
 
         assert_eq!(set.len(), len(&storage, &ldd));
     }

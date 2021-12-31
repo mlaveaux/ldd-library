@@ -7,7 +7,7 @@ use std::collections::HashSet;
 #[cfg(test)]
 use rand::Rng;
 
-// Returns a vector of the given length with random u64 values.
+/// Returns a vector of the given length with random u64 values.
 #[cfg(test)]
 pub fn random_vector(length: u64) -> Vec<u64> 
 {
@@ -21,7 +21,7 @@ pub fn random_vector(length: u64) -> Vec<u64>
     vector
 }
 
-// Returns a set of 'amount' vectors where every vector has the given length.
+/// Returns a set of 'amount' vectors where every vector has the given length.
 #[cfg(test)]
 pub fn random_vector_set(amount: u64, length: u64) ->  HashSet<Vec<u64>>
 {
@@ -36,13 +36,14 @@ pub fn random_vector_set(amount: u64, length: u64) ->  HashSet<Vec<u64>>
     result
 }
 
-// Construct and Ldd from a given HashSet.
+/// Returns an LDD containing all elements of the given iterator over vectors.
 #[cfg(test)]
-pub fn from_hashset(storage: &mut Storage, set: &HashSet<Vec<u64>>) -> Ldd
+pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
+    where I: Iterator<Item = &'a Vec<u64>>
 {
     let mut result = storage.empty_set().clone();
 
-    for vector in set
+    for vector in iter
     {
         let single = singleton(storage, vector);
         result = union(storage, &result, &single);
