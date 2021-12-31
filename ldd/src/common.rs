@@ -45,7 +45,7 @@ pub fn from_hashset(storage: &mut Storage, set: &HashSet<Vec<u64>>) -> Ldd
     for vector in set
     {
         let single = singleton(storage, vector);
-        result = union(storage, result, single);
+        result = union(storage, &result, &single);
     }
 
     result

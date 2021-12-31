@@ -129,7 +129,7 @@ mod tests
 
         let a = from_hashset(&mut storage, &set_a);
         let b = from_hashset(&mut storage, &set_b);
-        let result = union(&mut storage, a, b);
+        let result = union(&mut storage, &a, &b);
 
         for expected in set_a.union(&set_b)
         {
