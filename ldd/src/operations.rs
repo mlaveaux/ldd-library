@@ -2,7 +2,7 @@ use crate::{Ldd, Storage, Data, iterators::*};
 
 use std::cmp::Ordering;
 
-// Returns an LDD containing only the given vector, i.e., { vector }
+/// Returns an LDD containing only the given vector, i.e., { vector }.
 pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 {
     let mut root = storage.empty_vector().clone();
@@ -15,7 +15,7 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     root
 }
 
-// Returns the union of the given LDDs.
+/// Returns the union of the given LDDs.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
     if a == b {
@@ -46,7 +46,7 @@ pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
     }
 }
 
-// Returns true iff the given vector is included in the LDD.
+/// Returns true iff the set contains the vector.
 pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 {
     if vector.len() == 0
@@ -70,6 +70,27 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 
         false
     }    
+}
+
+/// Returns the number of elements in the set.
+pub fn len(storage: &Storage, set: &Ldd) -> usize
+{
+    if set == storage.empty_set() {
+        0
+    }
+    else if set == storage.empty_vector() {
+        1
+    }
+    else
+    {
+        let mut result: usize = 0;
+        for Data(_, down, _) in iter_right(&storage, &set)
+        {
+            result += len(storage, &down);
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
@@ -142,7 +163,7 @@ mod tests
         }
     }
     
-    // Compare the singleton implementation of union with a random vector used as input.
+    // Compare the singleton implementation with a random vector used as input.
     #[test]
     fn random_singleton()
     {
@@ -154,5 +175,17 @@ mod tests
         // Check that ldd contains exactly vector that is equal to the vector.
         let result = iter(&storage, &ldd).next().unwrap();
         assert_eq!(vector, result);
+    }
+
+    // Test the len function with random inputs.
+    #[test]
+    fn random_len()
+    {
+        let mut storage = Storage::new();
+
+        let set = random_vector_set(32, 10);
+        let ldd = from_hashset(&mut storage, &set);
+
+        assert_eq!(set.len(), len(&storage, &ldd));
     }
 }
