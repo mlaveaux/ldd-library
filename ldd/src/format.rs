@@ -1,8 +1,11 @@
-use crate::{Ldd, Storage, iterators::*};
+use crate::{Ldd, Storage, iterators::*, Data};
 
 use std::fmt;
+use std::io;
+use std::io::Write;
+use std::collections::HashSet;
 
-// Return a formatter for the given Ldd.
+/// Return a formatter for the given LDD.
 pub fn fmt_node(storage: &Storage, ldd: Ldd) -> Display
 {
     Display {
@@ -11,7 +14,7 @@ pub fn fmt_node(storage: &Storage, ldd: Ldd) -> Display
     }
 }
 
-// Print the lists represented by the given LddNode.
+/// Print the vectors contained in the LDD.
 pub struct Display<'a>
 {
     storage: &'a Storage,
@@ -22,7 +25,6 @@ fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Resul
 {
     for vector in iter(storage, ldd) 
     {
-        // Here, we have found another vector in the LDD.
         write!(f, "<")?;
         for val in vector
         {
@@ -41,5 +43,117 @@ impl fmt::Display for Display<'_>
         write!(f, "{{ \n")?;
         print(self.storage, &self.ldd, f)?;
         write!(f, "}}")
+    }
+}
+
+use std::hash::{Hash, Hasher};
+
+impl Hash for Ldd
+{    
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index().hash(state);
+    }
+}
+
+fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, ldd: &Ldd) -> io::Result<()>
+{
+    if marked.contains(ldd) || ldd == storage.empty_set() || ldd == storage.empty_vector()
+    {
+        Ok(())
+    }
+    else 
+    {
+        // Print the node values
+        write!(f, "{} [shape=record, label=\"", ldd.index())?;
+        
+        let mut first = true;
+        for Data(value, _, _) in iter_right(storage, &ldd)
+        {
+            if !first 
+            {
+                write!(f, "|")?;
+            }
+
+            write!(f, "<{0}> {0}", value)?;
+            first = false;
+        }
+        write!(f, "\"];\n")?;
+        
+        // Print the edges.
+        for Data(value, down, _) in iter_right(storage, &ldd)
+        {
+            if down != *storage.empty_set() && down != *storage.empty_vector()
+            {
+                write!(f, "{}:{} -> {}:{};\n", ldd.index(), value, down.index(), storage.get(&down).0)?;
+            }
+        }
+        
+        // Print all nodes.
+        for Data(_, down, _) in iter_right(storage, &ldd)
+        {
+            print_node(storage, f, marked, &down)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn print_dot(storage: &Storage, f: &mut impl Write, ldd: &Ldd) -> io::Result<()>
+{
+    write!(f, r#"
+digraph "DD" {{
+graph [dpi = 300];
+center = true;
+edge [dir = forward];
+
+"#)?;
+
+    // Every node must be printed once, so keep track of already printed ones.
+    let mut marked: HashSet<Ldd> = HashSet::new();
+
+    // We don't show these nodes in the output since every right most node is 'false' and every bottom node is 'true'.
+    // or in our terms empty_set and empty_vector. However, if the LDD itself is 'false' or 'true' we just show the single
+    // node for clarity.
+    if ldd == storage.empty_set() {
+        write!(f, "0 [shape=record, label=\"False\"];\n")?;
+    } else if ldd == storage.empty_vector() {
+        write!(f, "1 [shape=record, label=\"True\"];\n")?;
+    } else {
+        print_node(storage, f, &mut marked, ldd)?;
+    }
+
+    write!(f, "}}\n")
+}
+
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+    use crate::common::*;
+    
+    // We cannot really check whether the output is correct, but we can try to compile and run the formatters.
+    #[test]
+    fn random_format()
+    { 
+        let mut storage = Storage::new();
+
+        let set = random_vector_set(10, 5);
+        let ldd = from_iter(&mut storage, set.iter());
+
+        println!("ldd {}", fmt_node(&storage, ldd));
+    }
+
+    
+    // We cannot really check whether the output is correct, but we can try to compile and run the formatters.
+    #[test]
+    fn random_print_dot()
+    { 
+        let mut storage = Storage::new();
+
+        let set = random_vector_set(10, 5);
+        let ldd = from_iter(&mut storage, set.iter());
+
+        //print_dot(&storage, &mut std::io::stdout(), &ldd).unwrap();
     }
 }
