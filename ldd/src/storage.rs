@@ -19,6 +19,11 @@ impl Ldd
         storage.borrow_mut().protect(&result);
         result
     }
+
+    pub fn index(self: &Self) -> usize
+    {
+        self.index
+    }
 }
 
 impl Clone for Ldd
