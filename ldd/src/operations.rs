@@ -15,6 +15,44 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     root
 }
 
+
+/// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
+pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
+{
+    if a == b {
+        storage.empty_set().clone()
+    } else if a == storage.empty_set() {
+        storage.empty_set().clone()
+    } else if b == storage.empty_set() {
+        a.clone()
+    } else {
+        let Data(a_value, a_down, a_right) = storage.get(&a);
+        let Data(b_value, b_down, b_right) = storage.get(&b);
+
+        match a_value.cmp(&b_value) {
+            Ordering::Less => {
+                let right_result = minus(storage, &a_right, &b);
+                storage.insert(a_value, &a_down, &right_result)
+            },
+            Ordering::Equal => {
+                let down_result = minus(storage, &a_down, &b_down);
+                let right_result = minus(storage, &a_right, &b_right);
+                if down_result == *storage.empty_set()
+                {
+                    right_result
+                } 
+                else 
+                {
+                    storage.insert(a_value, &down_result, &right_result)
+                }                
+            },
+            Ordering::Greater => {
+                minus(storage, a, &b_right)
+            }
+        }
+    }
+}
+
 /// Returns the union of the given LDDs.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
@@ -98,6 +136,9 @@ mod tests
 {
     use super::*;    
     use crate::common::*;
+    use crate::print_dot;
+
+    use std::ops::Sub;
     use rand::Rng;
 
     // Compare the LDD element_of implementation for random inputs.
@@ -188,4 +229,42 @@ mod tests
 
         assert_eq!(set.len(), len(&storage, &ldd));
     }
+
+    // Test the minus function with random inputs.
+    #[test]
+    fn random_minus()
+    {
+        let mut storage = Storage::new();
+        
+        let set_a = random_vector_set(4, 4);
+        let set_b = {
+            let mut result = random_vector_set(4, 4);
+
+            // To ensure some overlap (which is unlikely) we insert some elements of a into b.
+            let mut it = set_a.iter();
+            for _ in 0..2
+            {
+                result.insert(it.next().unwrap().clone());
+            }
+
+            result
+        };
+
+        let expected_result = set_a.sub(&set_b);
+        
+        let a = from_iter(&mut storage, set_a.iter());
+        let b = from_iter(&mut storage, set_b.iter());
+        let result = minus(&mut storage, &a, &b);
+        
+        for expected in expected_result.iter()
+        {
+            assert!(element_of(&storage, expected, &result));
+        }
+
+        for value in iter(&storage, &result)
+        {
+            assert!(expected_result.contains(&value));
+        }
+    }
+
 }
