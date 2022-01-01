@@ -7,7 +7,10 @@ use std::collections::HashSet;
 #[cfg(test)]
 use rand::Rng;
 
+// These functions are only relevant for testing purposes.
+
 /// Returns a vector of the given length with random u64 values.
+/// We only generate values within 0 to 10 for testing purposes.
 #[cfg(test)]
 pub fn random_vector(length: u64) -> Vec<u64> 
 {
@@ -15,7 +18,7 @@ pub fn random_vector(length: u64) -> Vec<u64>
     let mut vector: Vec<u64> = Vec::new();
     for _ in 0..length
     {
-        vector.push(rng.gen());
+        vector.push(rng.gen_range(0..10));
     }
 
     vector
