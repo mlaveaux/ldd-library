@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "reach",
+    "examples/*",
     "ldd",
 ]
