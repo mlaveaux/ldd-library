@@ -124,36 +124,3 @@ edge [dir = forward];
 
     write!(f, "}}\n")
 }
-
-
-#[cfg(test)]
-mod tests
-{
-    use super::*;
-    use crate::common::*;
-    
-    // We cannot really check whether the output is correct, but we can try to compile and run the formatters.
-    #[test]
-    fn random_format()
-    { 
-        let mut storage = Storage::new();
-
-        let set = random_vector_set(10, 5);
-        let ldd = from_iter(&mut storage, set.iter());
-
-        println!("ldd {}", fmt_node(&storage, ldd));
-    }
-
-    
-    // We cannot really check whether the output is correct, but we can try to compile and run the formatters.
-    #[test]
-    fn random_print_dot()
-    { 
-        let mut storage = Storage::new();
-
-        let set = random_vector_set(10, 5);
-        let ldd = from_iter(&mut storage, set.iter());
-
-        //print_dot(&storage, &mut std::io::stdout(), &ldd).unwrap();
-    }
-}
