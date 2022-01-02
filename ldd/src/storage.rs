@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
-// Every LDD points to its root node by means of an index and it has the shared storage for the protection.
+/// Every LDD instance points to its root node in the storage.
 pub struct Ldd
 {
     index: usize,
@@ -61,7 +61,7 @@ impl Debug for Ldd
 
 impl Eq for Ldd {}
 
-// This is the LDD node(value, down, right) with a reference counter.
+/// This is the LDD node(value, down, right) with some additional meta data.
 struct Node
 {
     value: u64,
@@ -99,12 +99,12 @@ impl Node
     }
 }
 
-// This is only the user-facing data of a Node.
+/// This is the user-facing data of a Node.
 pub struct Data(pub u64, pub Ldd, pub Ldd);
 
-// The storage that implements the maximal sharing behaviour. Meaning that
-// identical nodes (same value, down and right) have a unique index in the node
-// table. Therefore Ldds n and m are identical iff their indices match.
+/// The storage that implements the maximal sharing behaviour. Meaning that
+/// identical nodes (same value, down and right) have a unique index in the node
+/// table. This means that Ldds n and m are identical iff their indices match.
 pub struct Storage
 {
     shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
