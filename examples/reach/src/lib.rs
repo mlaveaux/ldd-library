@@ -3,10 +3,9 @@ extern crate ldd;
 mod sylvan_io;
 
 use std::error::Error;
-use std::env;
 
 /// Performs state space exploration of the given model and reports the number of states.
-pub fn run(config: &Config) -> Result<(), Box<dyn Error>>
+pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
 {
     // Initialize the library.
     let mut storage = ldd::Storage::new();
@@ -25,13 +24,13 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>>
             //ldd::union(&mut storage, &todo1, &result);
         }
 
-        //todo = ldd::minus(&mut storage, &todo1, &states);
+        todo = ldd::minus(&mut storage, &todo1, &states);
         states = ldd::union(&mut storage, &states, &todo);
     }
 
     println!("The model has {} states", ldd::len(&storage, &states));
 
-    Ok(())
+    Ok(ldd::len(&storage, &states))
 }
 
 pub struct Config
@@ -42,7 +41,7 @@ pub struct Config
 impl Config
 {
     /// Parses the provided arguments and fills in the configuration.
-    pub fn new(mut args: env::Args) -> Result<Config, &'static str>
+    pub fn new(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str>
     {
         args.next(); // The first argument is the executable's location.
 
