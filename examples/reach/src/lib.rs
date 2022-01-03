@@ -20,8 +20,8 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
         let todo1 = storage.empty_set().clone();
         for transition in transitions.iter()
         {
-            //let result = ldd::relational_product(&mut storage, &todo, &transition.relation);
-            //ldd::union(&mut storage, &todo1, &result);
+            let result = ldd::relational_product(&mut storage, &todo, &transition.relation, &transition.meta);
+            ldd::union(&mut storage, &todo1, &result);
         }
 
         todo = ldd::minus(&mut storage, &todo1, &states);

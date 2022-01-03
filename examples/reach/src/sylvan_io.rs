@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::collections::HashMap;
 use std::error::Error;
+use std::cmp;
 
 struct SylvanReader
 {
@@ -112,17 +113,16 @@ fn read_projection(file: &mut File) -> Result<(Vec<u32>,  Vec<u32>), Box<dyn Err
         write_proj.push(value);
     }
 
-    //println!("read: {:?}", read_proj);
-    //println!("write: {:?}", read_proj);
+    println!("read: {:?}", read_proj);
+    println!("write: {:?}", write_proj);
 
     Ok((read_proj, write_proj))
 }
 
 pub struct Transition
 {
-    pub read_proj: Vec<u32>,
-    pub write_proj: Vec<u32>,
     pub relation: ldd::Ldd,
+    pub meta: ldd::Ldd,
 }
 
 pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ldd, Vec<Transition>), Box<dyn Error>>
@@ -130,7 +130,7 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
     let mut file = File::open(filename)?;
     let mut reader = SylvanReader::new();
 
-    let vector_length = read_u32(&mut file)?;
+    let _vector_length = read_u32(&mut file)?;
     //println!("Length of vector {}", vector_length);
 
     let _unused = read_u32(&mut file)?; // This is called 'k' in Sylvan's ldd2bdd.c, but unused.
@@ -143,11 +143,34 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
     for _ in 0..num_transitions
     {
         let (read_proj, write_proj) = read_projection(&mut file)?;
+
+        // Compute length of meta.
+        let length = cmp::max(
+            match read_proj.iter().max()
+            {
+                Some(x) => *x,
+                None => 0
+            }
+            , match write_proj.iter().max()
+            {
+                Some(x) => *x,
+                None => 0
+            });
+
+        // Convert projection vectors to meta.
+        let mut meta: Vec<u64> = Vec::new();
+        for i in 0..length
+        {
+            let read = read_proj.contains(&i);
+            let write = read_proj.contains(&i);
+
+            meta.push(0);
+        }
+
         transitions.push(
             Transition {
-                read_proj,
-                write_proj,
                 relation: storage.empty_set().clone(),
+                meta: ldd::singleton(storage, &meta),
             }
         );
     }

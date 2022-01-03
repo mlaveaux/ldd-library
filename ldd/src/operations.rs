@@ -15,6 +15,70 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     root
 }
 
+/// Computes the set of vectors reachable in one step from the set by the given sparse relation.
+/// 
+/// `{u -> v | u in set}` where `->` is described by rel and meta.
+/// 
+/// meta is a singleton vector where the value indicates the following:
+///     - 0 = not part the relation.
+pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
+{
+    if set == storage.empty_set() {
+        storage.empty_set().clone()
+    } else if rel == storage.empty_set() {
+        storage.empty_set().clone()
+    } else if meta == storage.empty_vector() {
+        // If meta is not defined then the rest is not in the relation (meta is always zero)
+        set.clone()
+    } else {
+        let Data(meta_value, meta_down, _) = storage.get(meta);
+
+        let result = match meta_value
+        {
+            0 => {
+                // Consider all values on this level part of the output and continue with rest.
+                let Data(value, down, right) = storage.get(set);
+
+                let right_result = relational_product(storage, &right, rel, meta);
+                let down_result = relational_product(storage, &down, rel, &meta_down);
+
+                storage.insert(value, &down_result, &right_result)
+            }
+            1 => {
+                // Read the values present in the relation and continue with these values in the set.
+                let Data(set_value, set_down, set_right) = storage.get(set);
+                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                
+                match set_value.cmp(&rel_value) {
+                    Ordering::Less => {
+                        relational_product(storage, &set_right, &rel, meta)                        
+                    }                    
+                    Ordering::Equal => {
+                        let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
+                        let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                        if down_result == *storage.empty_set()
+                        {
+                            right_result
+                        } 
+                        else 
+                        {
+                            storage.insert(set_value, &down_result, &right_result)
+                        }  
+                    }
+                    Ordering::Greater => {
+                        storage.empty_set().clone()                        
+                    }
+                }
+            }
+    
+            _ => {
+                panic!("meta has unexpected value");
+            }
+        };
+
+        result
+    }
+}
 
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
 pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
@@ -136,7 +200,6 @@ mod tests
 {
     use super::*;    
     use crate::common::*;
-    use crate::print_dot;
 
     use std::ops::Sub;
     use rand::Rng;
