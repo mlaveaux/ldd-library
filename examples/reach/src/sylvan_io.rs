@@ -21,7 +21,7 @@ impl SylvanReader
   }
   
   // Returns an LDD read from the given file in the Sylvan format.
-  pub fn read_ldd(self: &mut Self, storage: &mut ldd::Storage, file: &mut File) -> Result<ldd::Ldd, Box<dyn Error>>
+  pub fn read_ldd(&mut self, storage: &mut ldd::Storage, file: &mut File) -> Result<ldd::Ldd, Box<dyn Error>>
   {
       let count = read_u64(file)?;
       //println!("node count = {}", count);  
@@ -59,7 +59,7 @@ impl SylvanReader
   }
 
   // Returns the LDD belonging to the given index.
-  fn node_from_index(self: &Self, storage: &mut ldd::Storage, index: u64) -> ldd::Ldd
+  fn node_from_index(&self, storage: &mut ldd::Storage, index: u64) -> ldd::Ldd
   {
       if index == 0
       {
@@ -175,9 +175,9 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
         );
     }
 
-    for i in 0..num_transitions
+    for transition in transitions.iter_mut().take(num_transitions)
     {
-        transitions[i].relation = reader.read_ldd(storage, &mut file)?;
+        transition.relation = reader.read_ldd(storage, &mut file)?;
     }
 
     // Ignore the rest for now.

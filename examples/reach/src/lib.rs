@@ -13,7 +13,7 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
     let (initial_state, transitions) = sylvan_io::load_model(&mut storage, &config.filename)?;
 
     let mut todo = initial_state.clone();
-    let mut states = initial_state.clone(); // The state space.
+    let mut states = initial_state; // The state space.
 
     while todo != *storage.empty_set()
     {

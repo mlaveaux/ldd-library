@@ -30,7 +30,7 @@ fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Resul
         {
             write!(f, "{} ", val)?;
         }
-        write!(f, ">\n")?;
+        writeln!(f, ">")?;
     }
 
     Ok(())
@@ -40,7 +40,7 @@ impl fmt::Display for Display<'_>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
-        write!(f, "{{ \n")?;
+        writeln!(f, "{{")?;
         print(self.storage, &self.ldd, f)?;
         write!(f, "}}")
     }
@@ -67,7 +67,7 @@ fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, 
         write!(f, "{} [shape=record, label=\"", ldd.index())?;
         
         let mut first = true;
-        for Data(value, _, _) in iter_right(storage, &ldd)
+        for Data(value, _, _) in iter_right(storage, ldd)
         {
             if !first 
             {
@@ -77,19 +77,19 @@ fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, 
             write!(f, "<{0}> {0}", value)?;
             first = false;
         }
-        write!(f, "\"];\n")?;
+        writeln!(f, "\"];")?;
         
         // Print the edges.
-        for Data(value, down, _) in iter_right(storage, &ldd)
+        for Data(value, down, _) in iter_right(storage, ldd)
         {
             if down != *storage.empty_set() && down != *storage.empty_vector()
             {
-                write!(f, "{}:{} -> {}:{};\n", ldd.index(), value, down.index(), storage.get(&down).0)?;
+                writeln!(f, "{}:{} -> {}:{};", ldd.index(), value, down.index(), storage.get(&down).0)?;
             }
         }
         
         // Print all nodes.
-        for Data(_, down, _) in iter_right(storage, &ldd)
+        for Data(_, down, _) in iter_right(storage, ldd)
         {
             print_node(storage, f, marked, &down)?;
         }
@@ -115,12 +115,12 @@ edge [dir = forward];
     // or in our terms empty_set and empty_vector. However, if the LDD itself is 'false' or 'true' we just show the single
     // node for clarity.
     if ldd == storage.empty_set() {
-        write!(f, "0 [shape=record, label=\"False\"];\n")?;
+        writeln!(f, "0 [shape=record, label=\"False\"];")?;
     } else if ldd == storage.empty_vector() {
-        write!(f, "1 [shape=record, label=\"True\"];\n")?;
+        writeln!(f, "1 [shape=record, label=\"True\"];")?;
     } else {
         print_node(storage, f, &mut marked, ldd)?;
     }
 
-    write!(f, "}}\n")
+    writeln!(f, "}}")
 }

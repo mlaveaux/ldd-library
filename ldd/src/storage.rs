@@ -20,7 +20,7 @@ impl Ldd
         result
     }
 
-    pub fn index(self: &Self) -> usize
+    pub fn index(&self) -> usize
     {
         self.index
     }
@@ -126,6 +126,12 @@ pub struct SharedStorage
 const EMPTY_SET: usize = 0;
 const EMPTY_VECTOR: usize = 1;
 
+impl Default for Storage {
+    fn default() -> Self {
+        Self::new()
+    }
+}   
+
 impl Storage
 {
     pub fn new() -> Self
@@ -139,7 +145,7 @@ impl Storage
 
         shared.borrow_mut().table = vector;
 
-        let library = Self { 
+        Self { 
             index: HashMap::new(),
             shared: shared.clone(),
             // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
@@ -147,9 +153,7 @@ impl Storage
             height: vec![0, 0],
             empty_set: Ldd::new(&shared, EMPTY_SET),
             empty_vector: Ldd::new(&shared, EMPTY_VECTOR),
-        };
-               
-        library
+        }
     }
 
     // Create a new node(value, down, right)
@@ -166,7 +170,7 @@ impl Storage
             // Check that our height matches the right LDD.
             assert_eq!(self.height[down.index] + 1, self.height[right.index]);
             // Check that our value is less then the right value.
-            assert!(value < self.value(&right));
+            assert!(value < self.value(right));
         }
 
         let new_node = Node::new(value, down.index, right.index);
@@ -201,13 +205,8 @@ impl Storage
         let table = &mut self.shared.borrow_mut().table;
         let mut stack: Vec<usize> = vec![root];
 
-        loop
-        {
-            let current = match stack.pop() {
-                Some(x) => x,
-                None => break,
-            };
-            
+        while let Some(current) = stack.pop()
+        {            
             let node = &mut table[current];
             if node.marked
             {

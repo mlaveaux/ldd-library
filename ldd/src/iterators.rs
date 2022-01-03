@@ -88,20 +88,15 @@ impl Iterator for Iter<'_>
             }
         }
 
-        // Go up the chain to find the next right sibling that is not 'false'.    
-        loop
+        // Go up the chain to find the next right sibling that is not 'false'. 
+        while let Some(current) = self.stack.pop() 
         {
-            let current = match self.stack.pop() {
-                Some(x) => x,
-                None => break,
-            };
-
             self.vector.pop();
             let Data(_, _, right) = self.storage.get(&current);
 
             if right != *self.storage.empty_set()
             {
-                self.stack.push(right.clone()); // This is the first right sibling.
+                self.stack.push(right); // This is the first right sibling.
                 break;
             }           
         }

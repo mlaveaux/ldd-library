@@ -23,9 +23,7 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 ///     - 0 = not part the relation.
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
-    if set == storage.empty_set() {
-        storage.empty_set().clone()
-    } else if rel == storage.empty_set() {
+    if set == storage.empty_set() || rel == storage.empty_set() {
         storage.empty_set().clone()
     } else if meta == storage.empty_vector() {
         // If meta is not defined then the rest is not in the relation (meta is always zero)
@@ -51,7 +49,7 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                 
                 match set_value.cmp(&rel_value) {
                     Ordering::Less => {
-                        relational_product(storage, &set_right, &rel, meta)                        
+                        relational_product(storage, &set_right, rel, meta)                        
                     }                    
                     Ordering::Equal => {
                         let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
@@ -83,19 +81,17 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
 pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    if a == b {
-        storage.empty_set().clone()
-    } else if a == storage.empty_set() {
+    if a == b || a == storage.empty_set() {
         storage.empty_set().clone()
     } else if b == storage.empty_set() {
         a.clone()
     } else {
-        let Data(a_value, a_down, a_right) = storage.get(&a);
-        let Data(b_value, b_down, b_right) = storage.get(&b);
+        let Data(a_value, a_down, a_right) = storage.get(a);
+        let Data(b_value, b_down, b_right) = storage.get(b);
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
-                let right_result = minus(storage, &a_right, &b);
+                let right_result = minus(storage, &a_right, b);
                 storage.insert(a_value, &a_down, &right_result)
             },
             Ordering::Equal => {
@@ -127,8 +123,8 @@ pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
     } else if b == storage.empty_set() {
         a.clone()
     } else {
-        let Data(a_value, a_down, a_right) = storage.get(&a);
-        let Data(b_value, b_down, b_right) = storage.get(&b);
+        let Data(a_value, a_down, a_right) = storage.get(a);
+        let Data(b_value, b_down, b_right) = storage.get(b);
 
         match a_value.cmp(&b_value) {
             Ordering::Less => {
@@ -151,7 +147,7 @@ pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 /// Returns true iff the set contains the vector.
 pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 {
-    if vector.len() == 0
+    if vector.is_empty()
     {
         *ldd == *storage.empty_vector()
     }
@@ -161,12 +157,12 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
     }
     else
     {
-        for Data(value, down, _) in iter_right(&storage, ldd)
+        for Data(value, down, _) in iter_right(storage, ldd)
         {            
-            if value == vector[0] {
-                return element_of(storage, &vector[1..], &down);
-            } else if value > vector[0] {
-                return false;
+            match value.cmp(&vector[0]) { 
+                Ordering::Less => { continue; } 
+                Ordering::Equal => { return element_of(storage, &vector[1..], &down); }
+                Ordering::Greater => { return false; }
             }
         }
 
@@ -186,7 +182,7 @@ pub fn len(storage: &Storage, set: &Ldd) -> usize
     else
     {
         let mut result: usize = 0;
-        for Data(_, down, _) in iter_right(&storage, &set)
+        for Data(_, down, _) in iter_right(storage, set)
         {
             result += len(storage, &down);
         }
