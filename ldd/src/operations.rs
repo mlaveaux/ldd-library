@@ -208,7 +208,7 @@ mod tests
         let mut rng = rand::thread_rng();  
 
         let length = 10;
-        let set = random_vector_set(32, length);
+        let set = random_vector_set(32, length, 10);
         let ldd = from_iter(&mut storage, set.iter());
         
         // All elements in the set should be contained in the ldd.
@@ -220,21 +220,21 @@ mod tests
         // No shorter vectors should be contained in the ldd (try several times).
         for _ in 0..10
         {
-            let short_vector = random_vector(rng.gen_range(0..length));
+            let short_vector = random_vector(rng.gen_range(0..length), 10);
             assert!(!element_of(&storage, &short_vector, &ldd));
         }
 
         // No longer vectors should be contained in the ldd.
         for _ in 0..10
         {
-            let short_vector = random_vector(rng.gen_range(length+1..20));
+            let short_vector = random_vector(rng.gen_range(length+1..20), 10);
             assert!(!element_of(&storage, &short_vector, &ldd));
         }
 
         // Try vectors of correct size with both the set and ldd.
         for _ in 0..10
         {
-            let vector = random_vector(length);
+            let vector = random_vector(length, 10);
             assert_eq!(set.contains(&vector), element_of(&storage, &vector, &ldd));
         }
     }
@@ -245,22 +245,15 @@ mod tests
     {
         let mut storage = Storage::new();
 
-        let set_a = random_vector_set(32, 10);
-        let set_b = random_vector_set(32, 10);
+        let set_a = random_vector_set(32, 10, 10);
+        let set_b = random_vector_set(32, 10, 10);
 
         let a = from_iter(&mut storage, set_a.iter());
         let b = from_iter(&mut storage, set_b.iter());
         let result = union(&mut storage, &a, &b);
 
-        for expected in set_a.union(&set_b)
-        {
-            assert!(element_of(&storage, &expected, &result));
-        }
-
-        for vector in iter(&storage, &result)
-        {
-            assert!(set_a.contains(&vector) || set_b.contains(&vector));
-        }
+        let expected = from_iter(&mut storage, set_a.union(&set_b));
+        assert_eq!(result, expected);
     }
     
     // Compare the singleton implementation with a random vector used as input.
@@ -268,13 +261,15 @@ mod tests
     fn random_singleton()
     {
         let mut storage = Storage::new();
-        let vector = random_vector(10);
+        let vector = random_vector(10, 10);
 
         let ldd = singleton(&mut storage, &vector[..]);
 
         // Check that ldd contains exactly vector that is equal to the vector.
-        let result = iter(&storage, &ldd).next().unwrap();
+        let mut it = iter(&storage, &ldd);
+        let result = it.next().unwrap();
         assert_eq!(vector, result);
+        assert_eq!(it.next(), None); // No other vectors.
     }
 
     // Test the len function with random inputs.
@@ -283,7 +278,7 @@ mod tests
     {
         let mut storage = Storage::new();
 
-        let set = random_vector_set(32, 10);
+        let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
 
         assert_eq!(set.len(), len(&storage, &ldd));
@@ -295,13 +290,13 @@ mod tests
     {
         let mut storage = Storage::new();
         
-        let set_a = random_vector_set(4, 4);
+        let set_a = random_vector_set(32, 10, 10);
         let set_b = {
-            let mut result = random_vector_set(4, 4);
+            let mut result = random_vector_set(32, 10, 10);
 
             // To ensure some overlap (which is unlikely) we insert some elements of a into b.
             let mut it = set_a.iter();
-            for _ in 0..2
+            for _ in 0..16
             {
                 result.insert(it.next().unwrap().clone());
             }
@@ -314,6 +309,8 @@ mod tests
         let a = from_iter(&mut storage, set_a.iter());
         let b = from_iter(&mut storage, set_b.iter());
         let result = minus(&mut storage, &a, &b);
+        let expected = from_iter(&mut storage, expected_result.iter());
+        assert_eq!(result, expected);
         
         for expected in expected_result.iter()
         {

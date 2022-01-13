@@ -12,13 +12,13 @@ use rand::Rng;
 /// Returns a vector of the given length with random u64 values.
 /// We only generate values within 0 to 10 for testing purposes.
 #[cfg(test)]
-pub fn random_vector(length: u64) -> Vec<u64> 
+pub fn random_vector(length: u64, max_value: u64) -> Vec<u64> 
 {
     let mut rng = rand::thread_rng();    
     let mut vector: Vec<u64> = Vec::new();
     for _ in 0..length
     {
-        vector.push(rng.gen_range(0..10));
+        vector.push(rng.gen_range(0..max_value));
     }
 
     vector
@@ -26,14 +26,14 @@ pub fn random_vector(length: u64) -> Vec<u64>
 
 /// Returns a set of 'amount' vectors where every vector has the given length.
 #[cfg(test)]
-pub fn random_vector_set(amount: u64, length: u64) ->  HashSet<Vec<u64>>
+pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<Vec<u64>>
 {
     let mut result: HashSet<Vec<u64>> = HashSet::new();
 
     // Insert 'amount' number of vectors into the result.
     for _ in 0..amount
     {
-        result.insert(random_vector(length));
+        result.insert(random_vector(length, max_value));
     }
 
     result

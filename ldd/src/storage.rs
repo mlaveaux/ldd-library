@@ -333,7 +333,7 @@ mod tests
             // Make sure that this set goes out of scope, but keep a reference to some child ldd.
             //let set = random_vector_set(1, 10);
             //let ldd = from_hashset(&mut storage, &set);
-            let vector = random_vector(10);
+            let vector = random_vector(10, 10);
             let ldd = singleton(&mut storage, &vector);
 
             _child = storage.get(&ldd).1;

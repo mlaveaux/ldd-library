@@ -117,7 +117,7 @@ mod tests
     {
         let mut storage = Storage::new();
 
-        let set = random_vector_set(32, 10);
+        let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
 
         // Check that the number of iterations matches the number of elements in the set.
