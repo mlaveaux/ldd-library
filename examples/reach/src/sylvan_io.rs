@@ -48,7 +48,7 @@ impl SylvanReader
           let down = self.node_from_index(storage, down);
           let right = self.node_from_index(storage, right);
 
-          let ldd = storage.insert(value.try_into().unwrap(), &down, &right);
+          let ldd = storage.insert(value as u64, &down, &right);
           self.indexed_set.insert(self.last_index, ldd);
           
           self.last_index += 1;
@@ -92,25 +92,25 @@ fn read_u64(file: &mut File) -> Result<u64, Box<dyn Error>>
     Ok(u64::from_le_bytes(buffer))
 }
 
-fn read_projection(file: &mut File) -> Result<(Vec<u32>,  Vec<u32>), Box<dyn Error>>
+fn read_projection(file: &mut File) -> Result<(Vec<u64>,  Vec<u64>), Box<dyn Error>>
 {
     let num_read = read_u32(file)?;
     let num_write = read_u32(file)?;
 
     // Read num_read integers for the read parameters.
-    let mut read_proj: Vec<u32> = Vec::new();
+    let mut read_proj: Vec<u64> = Vec::new();
     for _ in 0..num_read
     {
         let value = read_u32(file)?;
-        read_proj.push(value);
+        read_proj.push(value as u64);
     }
 
     // Read num_write integers for the write parameters.
-    let mut write_proj: Vec<u32> = Vec::new();
+    let mut write_proj: Vec<u64> = Vec::new();
     for _ in 0..num_write
     {
         let value = read_u32(file)?;
-        write_proj.push(value);
+        write_proj.push(value as u64);
     }
 
     println!("read: {:?}", read_proj);
@@ -136,7 +136,7 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
     let _unused = read_u32(&mut file)?; // This is called 'k' in Sylvan's ldd2bdd.c, but unused.
     let initial_state = reader.read_ldd(storage, &mut file)?;
 
-    let num_transitions: usize = read_u32(&mut file)?.try_into().unwrap();
+    let num_transitions: usize = read_u32(&mut file)? as usize;
     let mut transitions: Vec<Transition> = Vec::new();
 
     // Read all the transition groups.

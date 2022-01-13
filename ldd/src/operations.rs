@@ -15,7 +15,87 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     root
 }
 
-/// Computes the set of vectors reachable in one step from the set by the given sparse relation.
+/// Computes a projection LDD that is suitable for the project operation from
+/// the given projection indices. This function is provided to be able to cache
+/// the projection LDD instead of computing it from the projection array every
+/// time.
+/// 
+/// see [project] for more information.
+pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
+{
+    // Compute length of meta.
+    let length = match proj.iter().max()
+    {
+        Some(x) => *x+1,
+        None => 0
+    };
+
+    // Convert projection vectors to meta.
+    let mut result: Vec<u64> = Vec::new();
+    for i in 0..length
+    {
+        let included = proj.contains(&i);
+
+        if included {
+            result.push(1);
+        }
+        else {
+            result.push(0);
+        }
+    }
+    
+    singleton(storage, &result)
+}
+
+/// Computes the set of vectors projected onto the given indices [i_0, ..., i_k], where 'proj' is equal to compute_proj([i_0, ..., i_k])
+/// 
+/// Formally, for a single vector <x_0, ..., x_n> we have that:
+///     - project(<x_0, ..., x_n>, i_0 < ... < i_k) = <x_(i_0), ..., x_(i_k)>
+///     - project(X, i_0 < ... < i_k) = {project(x, i_0 < ... < i_k) | x in X}. 
+/// 
+/// Note that the indices are sorted in the definition, but compute_proj
+/// can take any array and ignores both duplicates and order. Also, it 
+/// follows that i_k must be smaller than or equal to n as x_(i_k) is not 
+/// defined otherwise.
+pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
+{
+    assert_ne!(proj, storage.empty_set());
+
+    if set == storage.empty_set()  {
+        storage.empty_set().clone()
+    } else if set == storage.empty_vector() {
+        set.clone()
+    } else if proj == storage.empty_vector() {
+        // If meta is not defined then the rest is not in the projection (proj is always zero)
+        storage.empty_vector().clone()
+    } else {
+        let Data(proj_value, proj_down, _) = storage.get(proj);
+        let Data(value, down, right) =  storage.get(set);
+
+        match proj_value {
+            0 => {
+                let right_result = project(storage, &right, &proj);
+                let down_result = project(storage, &down, &proj_down);
+                union(storage, &right_result, &down_result)
+            }
+            1 => {
+                let right_result = project(storage, &right, &proj);
+                let down_result = project(storage, &down, &proj_down);
+                if down_result == *storage.empty_set()
+                {
+                    right_result
+                } 
+                else 
+                {
+                    storage.insert(value, &down_result, &right_result)
+                }
+            }
+            _ => {
+                panic!("Unhandled case");
+            }
+        }
+    }
+}
 /// 
 /// `{u -> v | u in set}` where `->` is described by rel and meta.
 /// 
@@ -197,6 +277,7 @@ mod tests
     use super::*;    
     use crate::common::*;
 
+    use std::collections::HashSet;
     use std::ops::Sub;
     use rand::Rng;
 
@@ -311,16 +392,34 @@ mod tests
         let result = minus(&mut storage, &a, &b);
         let expected = from_iter(&mut storage, expected_result.iter());
         assert_eq!(result, expected);
-        
-        for expected in expected_result.iter()
-        {
-            assert!(element_of(&storage, expected, &result));
-        }
-
-        for value in iter(&storage, &result)
-        {
-            assert!(expected_result.contains(&value));
-        }
     }
 
+    // Test the project function with random inputs.
+    #[test]
+    fn random_project()
+    {
+        let mut storage = Storage::new();
+        
+        let set = random_vector_set(32, 10, 10);
+        let proj: Vec<u64> = vec![0,3,7,9];
+
+        // Compute a naive projection on the vector set.
+        let mut expected_result: HashSet<Vec<u64>> = HashSet::new();
+        for element in &set
+        {
+            let mut projection = Vec::<u64>::new();
+            for i in &proj
+            {
+                projection.push(element[*i as usize]);
+            }
+            expected_result.insert(projection);
+        }
+
+        let ldd = from_iter(&mut storage, set.iter());
+        let proj_ldd = compute_proj(&mut storage, &proj);
+        let result = project(&mut storage, &ldd, &proj_ldd);
+
+        let expected = from_iter(&mut storage, expected_result.iter());
+        assert_eq!(result, expected);
+    }
 }
