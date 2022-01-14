@@ -90,8 +90,8 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
                     storage.insert(value, &down_result, &right_result)
                 }
             }
-            _ => {
-                panic!("Unhandled case");
+            x => {
+                panic!("proj has unexpected value {}", x);
             }
         }
     }
@@ -147,10 +147,9 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                         storage.empty_set().clone()                        
                     }
                 }
-            }
-    
-            _ => {
-                panic!("meta has unexpected value");
+            }    
+            x => {
+                panic!("meta has unexpected value: {}", x);
             }
         };
 
