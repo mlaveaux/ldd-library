@@ -113,9 +113,6 @@ fn read_projection(file: &mut File) -> Result<(Vec<u64>,  Vec<u64>), Box<dyn Err
         write_proj.push(value as u64);
     }
 
-    println!("read: {:?}", read_proj);
-    println!("write: {:?}", write_proj);
-
     Ok((read_proj, write_proj))
 }
 
@@ -144,33 +141,10 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
     {
         let (read_proj, write_proj) = read_projection(&mut file)?;
 
-        // Compute length of meta.
-        let length = cmp::max(
-            match read_proj.iter().max()
-            {
-                Some(x) => *x,
-                None => 0
-            }
-            , match write_proj.iter().max()
-            {
-                Some(x) => *x,
-                None => 0
-            });
-
-        // Convert projection vectors to meta.
-        let mut meta: Vec<u64> = Vec::new();
-        for i in 0..length
-        {
-            let read = read_proj.contains(&i);
-            let write = read_proj.contains(&i);
-
-            meta.push(0);
-        }
-
         transitions.push(
             Transition {
                 relation: storage.empty_set().clone(),
-                meta: ldd::singleton(storage, &meta),
+                meta: ldd::compute_meta(storage, &read_proj, &write_proj),
             }
         );
     }
