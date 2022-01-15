@@ -4,7 +4,7 @@ mod sylvan_io;
 
 use std::error::Error;
 
-/// Performs state space exploration of the given model and reports the number of states.
+/// Performs state space exploration of the given model and returns the number of states.
 pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
 {
     // Initialize the library.

@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io::Read;
 use std::collections::HashMap;
 use std::error::Error;
-use std::cmp;
 
 struct SylvanReader
 {
@@ -20,7 +19,7 @@ impl SylvanReader
     }
   }
   
-  // Returns an LDD read from the given file in the Sylvan format.
+  /// Returns an LDD read from the given file in the Sylvan format.
   pub fn read_ldd(&mut self, storage: &mut ldd::Storage, file: &mut File) -> Result<ldd::Ldd, Box<dyn Error>>
   {
       let count = read_u64(file)?;
@@ -43,7 +42,8 @@ impl SylvanReader
           bytes[2..4].copy_from_slice(&b.to_le_bytes()[0..2]); 
           let value = u32::from_le_bytes(bytes);
 
-          //println!("{}: node({}, {}, {})", self.last_index, value, down, right);
+          let copy = right & 0x10000;
+          assert_eq!(copy, 0); // We do not yet handle copy nodes.
           
           let down = self.node_from_index(storage, down);
           let right = self.node_from_index(storage, right);
@@ -58,7 +58,7 @@ impl SylvanReader
       Ok(self.indexed_set.get(&result).unwrap().clone())
   }
 
-  // Returns the LDD belonging to the given index.
+  /// Returns the LDD belonging to the given index.
   fn node_from_index(&self, storage: &mut ldd::Storage, index: u64) -> ldd::Ldd
   {
       if index == 0
@@ -76,6 +76,7 @@ impl SylvanReader
   }
 }
 
+/// Returns a single u32 read from the file.
 fn read_u32(file: &mut File) -> Result<u32, Box<dyn Error>>
 {
     let mut buffer: [u8; 4] = Default::default();
@@ -84,6 +85,7 @@ fn read_u32(file: &mut File) -> Result<u32, Box<dyn Error>>
     Ok(u32::from_le_bytes(buffer))
 }
 
+/// Returns a single u64 read from the file.
 fn read_u64(file: &mut File) -> Result<u64, Box<dyn Error>>
 {
     let mut buffer: [u8; 8] = Default::default();
@@ -92,6 +94,7 @@ fn read_u64(file: &mut File) -> Result<u64, Box<dyn Error>>
     Ok(u64::from_le_bytes(buffer))
 }
 
+/// Reads the read and write projections from the file.
 fn read_projection(file: &mut File) -> Result<(Vec<u64>,  Vec<u64>), Box<dyn Error>>
 {
     let num_read = read_u32(file)?;
@@ -122,6 +125,7 @@ pub struct Transition
     pub meta: ldd::Ldd,
 }
 
+/// Returns the (initial state, transitions) read from the file in Sylvan's format.
 pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ldd, Vec<Transition>), Box<dyn Error>>
 {    
     let mut file = File::open(filename)?;

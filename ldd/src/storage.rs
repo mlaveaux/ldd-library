@@ -114,17 +114,14 @@ pub struct Storage
     empty_vector: Ldd,
     
     height: Vec<u64>, // Used for debugging to ensure that the created LDDs are valid.
-    //reference_count_changes: u64, // The number of times reference counters are changed.
 }
 
-// Gives every node shared access to the underlying table.
+/// Gives every node shared access to their reference counter.
 pub struct SharedStorage
 {    
     table: Vec<Node>,
+    reference_count_changes: u64, // The number of times reference counters are changed.
 }
-
-const EMPTY_SET: usize = 0;
-const EMPTY_VECTOR: usize = 1;
 
 impl Default for Storage {
     fn default() -> Self {
@@ -136,7 +133,7 @@ impl Storage
 {
     pub fn new() -> Self
     {
-        let shared = Rc::new(RefCell::new(SharedStorage { table: vec![] }));
+        let shared = Rc::new(RefCell::new(SharedStorage { table: vec![], reference_count_changes: 0 }));
         let vector = vec![
                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
                 Node::new(0, 0, 0),
@@ -151,12 +148,12 @@ impl Storage
             // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
             free: vec![],
             height: vec![0, 0],
-            empty_set: Ldd::new(&shared, EMPTY_SET),
-            empty_vector: Ldd::new(&shared, EMPTY_VECTOR),
+            empty_set: Ldd::new(&shared, 0),
+            empty_vector: Ldd::new(&shared, 1),
         }
     }
 
-    // Create a new node(value, down, right)
+    /// Create a new LDD node(value, down, right)
     pub fn insert(&mut self, value: u64, down: &Ldd, right: &Ldd) -> Ldd
     {
         // Check the validity of the down and right nodes.
@@ -200,6 +197,7 @@ impl Storage
         )
     }
 
+    /// Mark all LDDs reachable from the given root index.
     fn mark_node(&mut self, root: usize)
     {
         let table = &mut self.shared.borrow_mut().table;
@@ -221,6 +219,7 @@ impl Storage
         }
     }
 
+    /// Cleans up all LDDs that are unreachable from the root LDDs.
     pub fn garbage_collect(&mut self)
     {
         let mut roots: Vec<usize> = vec![];
@@ -268,31 +267,37 @@ impl Storage
         }
     }
 
-    // The 'false' LDD.
+    /// The 'false' LDD.
     pub fn empty_set(&self) -> &Ldd
     {
         &self.empty_set
     }
 
-    // The 'true' LDD.
+    /// The 'true' LDD.
     pub fn empty_vector(&self) -> &Ldd
     {
         &self.empty_vector
     }
 
+    /// The value of an LDD node(value, down, right), i.e., cannot be 'true' or 'false.
     pub fn value(&self, ldd: &Ldd) -> u64
     {
+        assert_ne!(ldd, self.empty_set());
+        assert_ne!(ldd, self.empty_vector()); 
         self.shared.borrow().table[ldd.index].value
     }
 
+    /// Returns a Data tuple for the given LDD node(value, down, right), i.e., cannot be 'true' or 'false.
     pub fn get(&self, ldd: &Ldd) -> Data
     {
+        assert_ne!(ldd, self.empty_set());
+        assert_ne!(ldd, self.empty_vector());         
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
             // Ensure that this node is valid as garbage collection will insert garbage values.
-            assert_ne!(node.down, EMPTY_SET);
-            assert_ne!(node.right, EMPTY_VECTOR); 
+            assert_ne!(node.down, 0);
+            assert_ne!(node.right, 1); 
 
             data = (node.value, node.down, node.right);
         }
@@ -303,16 +308,18 @@ impl Storage
 
 impl SharedStorage
 {
-    // Protect the given ldd to prevent garbage collection.
+    /// Protect the given ldd to prevent garbage collection.
     fn protect(&mut self, ldd: &Ldd)
     {
-        self.table[ldd.index].reference_count += 1
+        self.reference_count_changes += 1;
+        self.table[ldd.index].reference_count += 1;
     }
     
-    // Remove protection from the given LDD.
+    /// Remove protection from the given LDD.
     fn unprotect(&mut self, ldd: &Ldd)
     {
-        self.table[ldd.index].reference_count -= 1
+        self.reference_count_changes += 1;
+        self.table[ldd.index].reference_count -= 1;
     }
 }
 

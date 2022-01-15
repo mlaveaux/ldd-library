@@ -5,7 +5,7 @@ use std::io;
 use std::io::Write;
 use std::collections::HashSet;
 
-/// Return a formatter for the given LDD.
+/// Print the vector set represented by the LDD.
 pub fn fmt_node(storage: &Storage, ldd: Ldd) -> Display
 {
     Display {
@@ -14,11 +14,47 @@ pub fn fmt_node(storage: &Storage, ldd: Ldd) -> Display
     }
 }
 
-/// Print the vectors contained in the LDD.
+/// Prints the given LDD is the 'dot' format, which can be converted into an image using 'GraphViz'.
+pub fn print_dot(storage: &Storage, f: &mut impl Write, ldd: &Ldd) -> io::Result<()>
+{
+    write!(f, r#"
+digraph "DD" {{
+graph [dpi = 300];
+center = true;
+edge [dir = forward];
+
+"#)?;
+
+    // Every node must be printed once, so keep track of already printed ones.
+    let mut marked: HashSet<Ldd> = HashSet::new();
+
+    // We don't show these nodes in the output since every right most node is 'false' and every bottom node is 'true'.
+    // or in our terms empty_set and empty_vector. However, if the LDD itself is 'false' or 'true' we just show the single
+    // node for clarity.
+    if ldd == storage.empty_set() {
+        writeln!(f, "0 [shape=record, label=\"False\"];")?;
+    } else if ldd == storage.empty_vector() {
+        writeln!(f, "1 [shape=record, label=\"True\"];")?;
+    } else {
+        print_node(storage, f, &mut marked, ldd)?;
+    }
+
+    writeln!(f, "}}")
+}
+
 pub struct Display<'a>
 {
     storage: &'a Storage,
     ldd: Ldd,
+}
+impl fmt::Display for Display<'_>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        writeln!(f, "{{")?;
+        print(self.storage, &self.ldd, f)?;
+        write!(f, "}}")
+    }
 }
 
 fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Result
@@ -34,16 +70,6 @@ fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Resul
     }
 
     Ok(())
-}
-
-impl fmt::Display for Display<'_>
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
-    {
-        writeln!(f, "{{")?;
-        print(self.storage, &self.ldd, f)?;
-        write!(f, "}}")
-    }
 }
 
 use std::hash::{Hash, Hasher};
@@ -96,31 +122,4 @@ fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, 
 
         Ok(())
     }
-}
-
-pub fn print_dot(storage: &Storage, f: &mut impl Write, ldd: &Ldd) -> io::Result<()>
-{
-    write!(f, r#"
-digraph "DD" {{
-graph [dpi = 300];
-center = true;
-edge [dir = forward];
-
-"#)?;
-
-    // Every node must be printed once, so keep track of already printed ones.
-    let mut marked: HashSet<Ldd> = HashSet::new();
-
-    // We don't show these nodes in the output since every right most node is 'false' and every bottom node is 'true'.
-    // or in our terms empty_set and empty_vector. However, if the LDD itself is 'false' or 'true' we just show the single
-    // node for clarity.
-    if ldd == storage.empty_set() {
-        writeln!(f, "0 [shape=record, label=\"False\"];")?;
-    } else if ldd == storage.empty_vector() {
-        writeln!(f, "1 [shape=record, label=\"True\"];")?;
-    } else {
-        print_node(storage, f, &mut marked, ldd)?;
-    }
-
-    writeln!(f, "}}")
 }

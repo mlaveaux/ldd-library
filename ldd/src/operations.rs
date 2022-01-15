@@ -15,12 +15,11 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
     root
 }
 
-/// Computes a projection LDD that is suitable for the project operation from
-/// the given projection indices. This function is provided to be able to cache
-/// the projection LDD instead of computing it from the projection array every
-/// time.
-/// 
-/// see [project] for more information.
+/// Computes a meta LDD that is suitable for the [project] function from the
+/// given projection indices. 
+///
+/// This function is useful to be able to cache the projection LDD instead of
+/// computing it from the projection array every time.
 pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
 {
     // Compute length of proj.
@@ -47,7 +46,9 @@ pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
     singleton(storage, &result)
 }
 
-/// Computes the set of vectors projected onto the given indices [i_0, ..., i_k], where 'proj' is equal to compute_proj([i_0, ..., i_k])
+/// Computes the set of vectors projected onto the given indices, 
+/// 
+/// Let 'proj' be equal to compute_proj([i_0, ..., i_k]).
 /// 
 /// Formally, for a single vector <x_0, ..., x_n> we have that:
 ///     - project(<x_0, ..., x_n>, i_0 < ... < i_k) = <x_(i_0), ..., x_(i_k)>
@@ -59,7 +60,7 @@ pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
 /// defined otherwise.
 pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
 {
-    assert_ne!(proj, storage.empty_set(), "proj can be at most as high as set");
+    assert_ne!(proj, storage.empty_set(), "proj must be a singleton");
 
     if set == storage.empty_set()  {
         storage.empty_set().clone()
@@ -67,19 +68,19 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
         // If meta is not defined then the rest is not in the projection (proj is always zero)
         storage.empty_vector().clone()
     } else {
-        assert_ne!(set, storage.empty_vector(), "Can only be empty_vector if proj is empty_vector");
+        assert_ne!(set, storage.empty_vector(), "proj can be at most as high as set");
 
         let Data(proj_value, proj_down, _) = storage.get(proj);
         let Data(value, down, right) =  storage.get(set);
 
         match proj_value {
             0 => {
-                let right_result = project(storage, &right, &proj);
+                let right_result = project(storage, &right, proj);
                 let down_result = project(storage, &down, &proj_down);
                 union(storage, &right_result, &down_result)
             }
             1 => {
-                let right_result = project(storage, &right, &proj);
+                let right_result = project(storage, &right, proj);
                 let down_result = project(storage, &down, &proj_down);
                 if down_result == *storage.empty_set()
                 {
@@ -254,9 +255,6 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
 pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    assert_ne!(a, storage.empty_vector());
-    assert_ne!(b, storage.empty_vector());
-
     if a == b || a == storage.empty_set() {
         storage.empty_set().clone()
     } else if b == storage.empty_set() {
@@ -292,8 +290,6 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 /// Returns the union of the given LDDs.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    assert_ne!(a, storage.empty_vector());
-    assert_ne!(b, storage.empty_vector());
 
     if a == b {
         a.clone()
