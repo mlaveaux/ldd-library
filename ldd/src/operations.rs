@@ -98,23 +98,23 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
     }
 }
 
-/// Computes a 'meta' LDD from the given read and write projections that is suitable for the relational_product.
-/// 
-/// The read and write projections are arrays of indices that are read, respectively written, by the corresponding sparse relation.
-/// 
-/// see [relational_product] for more information.
+/// Computes a meta LDD from the given read and write projections that is
+/// suitable for [relational_product].
+///
+/// The read and write projections are arrays of indices that are read,
+/// respectively written, by the corresponding sparse relation.
 pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]) -> Ldd
 {
     // Compute length of meta.
     let length = cmp::max(
         match read_proj.iter().max()
         {
-            Some(x) => *x,
+            Some(x) => *x+1,
             None => 0
         }
         , match write_proj.iter().max()
         {
-            Some(x) => *x,
+            Some(x) => *x+1,
             None => 0
         });
 
@@ -144,7 +144,7 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 
 /// Computes the set of vectors reachable in one step from the given 'set' as defined by the sparse relation rel, where meta = compute_meta(read_proj, write_proj).
 /// 
-/// relational_product(R, S, read_proj, write_proj) = { S[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R }
+/// relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
 ///     where R is the relation and S the set.
 ///  
 /// meta is a singleton vector where the value indicates the following for that index:
@@ -154,8 +154,6 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 ///     - 3 = both in read_proj and write_proj
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
-    assert_ne!(set, storage.empty_vector());
-    assert_ne!(rel, storage.empty_vector());
     assert_ne!(meta, storage.empty_set());
 
     if set == storage.empty_set() || rel == storage.empty_set() {
@@ -206,43 +204,38 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                         }  
                     }
                     Ordering::Greater => {
-                        relational_product(storage, &set, &rel_right, meta)
+                        relational_product(storage, set, &rel_right, meta)
                     }
                 }
             }
             2 => {
-                // Read the values present in the relation and continue with these values in the set.
+                // All values in set should be considered.
+                let mut combined = storage.empty_set().clone(); 
+                let mut current = set.clone();            
+                loop {
+                    let Data(_, set_down, set_right) = storage.get(&current);
+                    combined = union(storage, &combined, &set_down);
+
+                    if set_right == *storage.empty_set() {
+                        break;
+                    }
+                    current = set_right;
+                } 
+                
+                // Write the values present in the relation.
                 let Data(rel_value, rel_down, rel_right) = storage.get(rel);
 
-                
-                /*storage.insert(rel_value, &down_result, &right_result)
-                
-                match set_value.cmp(&rel_value) {
-                    Ordering::Less => {
-                        relational_product(storage, &set_right, rel, meta)                        
-                    }                    
-                    Ordering::Equal => {
-                        let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
-                        let right_result = relational_product(storage, &set_right, &rel_right, meta);
-                        if down_result == *storage.empty_set()
-                        {
-                            right_result
-                        } 
-                        else 
-                        {
-                            storage.insert(set_value, &down_result, &right_result)
-                        }  
-                    }
-                    Ordering::Greater => {
-                        storage.empty_set().clone()                        
-                    }
-                }*/
-                storage.empty_set().clone() 
+                let down_result = relational_product(storage, &combined, &rel_down, &meta_down);
+                let right_result = relational_product(storage, set, &rel_right, meta);
+                if down_result == *storage.empty_set()
+                {
+                    right_result
+                } 
+                else 
+                {
+                    storage.insert(rel_value, &down_result, &right_result)
+                }
             }
-            3 => {
-                storage.empty_set().clone() 
-            }
-    
             x => {
                 panic!("meta has unexpected value: {}", x);
             }
@@ -290,7 +283,6 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 /// Returns the union of the given LDDs.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-
     if a == b {
         a.clone()
     } else if a == storage.empty_set() {
@@ -482,28 +474,48 @@ mod tests
         assert_eq!(result, expected);
     }
 
-    // Test the relational product function with random inputs.
+    // Test the relational product function with read-only inputs.
     #[test]
-    fn random_relational_product()
+    fn random_readonly_relational_product()
     {
-        let mut storage = Storage::new();
-        
+        let mut storage = Storage::new();        
         let set = random_vector_set(32, 10, 10);
 
-        // First, test with a read only projection.
-        {
-            let ldd =  from_iter(&mut storage, set.iter());
+        // relational_product(R, S, read_proj, []) = { x | project(x, read_proj) = x' and (x', <>) in R and x in S }
+        let ldd =  from_iter(&mut storage, set.iter());
 
-            let proj: Vec<u64> = vec![0,3,7,9];
-            let proj_ldd = compute_proj(&mut storage, &proj);
-            let meta = compute_meta(&mut storage, &proj, &[]);
+        let read_proj: Vec<u64> = vec![0,3,7,9];
+        let meta = compute_meta(&mut storage, &read_proj, &[]);
 
-            let relation = project(&mut storage, &ldd, &proj_ldd);
-            let result = relational_product(&mut storage, &ldd, &relation, &meta);
-            let read_project = project(&mut storage, &result, &proj_ldd);
+        let proj_ldd = compute_proj(&mut storage, &read_proj);
+        let relation = project(&mut storage, &ldd, &proj_ldd);
 
-            assert_eq!(read_project, relation);
-        }
+        let result = relational_product(&mut storage, &ldd, &relation, &meta);
+        let read_project = project(&mut storage, &result, &proj_ldd);
+
+        assert_eq!(read_project, relation);
+    }
+
+    // Test the relational product function with write-only inputs.
+    #[test]
+    fn random_writeonly_relational_product()
+    {
+        let mut storage = Storage::new();        
+        let set = random_vector_set(32, 10, 10);
+
+        // relational_product(R, S, [], write_proj) = { x[write_proj := y'] | (<>, y') in R and x in S }
+        let ldd = from_iter(&mut storage, set.iter());
+
+        let write_proj: Vec<u64> = vec![0,3,7,9];
+        let meta = compute_meta(&mut storage, &[], &write_proj);
+
+        let proj_ldd = compute_proj(&mut storage, &write_proj);
+        let relation = project(&mut storage, &ldd, &proj_ldd);
+
+        let result = relational_product(&mut storage, &ldd, &relation, &meta);
+        let write_project = project(&mut storage, &result, &proj_ldd);
+
+        assert_eq!(write_project, relation);
     }
 
     // Test the project function with random inputs.
