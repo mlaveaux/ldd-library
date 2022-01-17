@@ -481,7 +481,6 @@ mod tests
         let mut storage = Storage::new();        
         let set = random_vector_set(32, 10, 10);
 
-        // relational_product(R, S, read_proj, []) = { x | project(x, read_proj) = x' and (x', <>) in R and x in S }
         let ldd =  from_iter(&mut storage, set.iter());
 
         let read_proj: Vec<u64> = vec![0,3,7,9];
@@ -493,6 +492,7 @@ mod tests
         let result = relational_product(&mut storage, &ldd, &relation, &meta);
         let read_project = project(&mut storage, &result, &proj_ldd);
 
+        // relational_product(R, S, read_proj, []) = { x | project(x, read_proj) = x' and (x', <>) in R and x in S }
         assert_eq!(read_project, relation);
     }
 
@@ -503,7 +503,6 @@ mod tests
         let mut storage = Storage::new();        
         let set = random_vector_set(32, 10, 10);
 
-        // relational_product(R, S, [], write_proj) = { x[write_proj := y'] | (<>, y') in R and x in S }
         let ldd = from_iter(&mut storage, set.iter());
 
         let write_proj: Vec<u64> = vec![0,3,7,9];
@@ -515,6 +514,7 @@ mod tests
         let result = relational_product(&mut storage, &ldd, &relation, &meta);
         let write_project = project(&mut storage, &result, &proj_ldd);
 
+        // relational_product(R, S, [], write_proj) = { x[write_proj := y'] | (<>, y') in R and x in S }
         assert_eq!(write_project, relation);
     }
 
@@ -527,23 +527,17 @@ mod tests
         let set = random_vector_set(32, 10, 10);
         let proj: Vec<u64> = vec![0,3,7,9];
 
-        // Compute a naive projection on the vector set.
-        let mut expected_result: HashSet<Vec<u64>> = HashSet::new();
-        for element in &set
-        {
-            let mut projection = Vec::<u64>::new();
-            for i in &proj
-            {
-                projection.push(element[*i as usize]);
-            }
-            expected_result.insert(projection);
-        }
-
         let ldd = from_iter(&mut storage, set.iter());
         let proj_ldd = compute_proj(&mut storage, &proj);
         let result = project(&mut storage, &ldd, &proj_ldd);
 
+        // Compute a naive projection on the vector set.
+        let mut expected_result: HashSet<Vec<u64>> = HashSet::new();
+        for element in &set
+        {
+            expected_result.insert(project_vector(element, &proj));
+        }
         let expected = from_iter(&mut storage, expected_result.iter());
-        assert_eq!(result, expected);
+        assert_eq!(result, expected, "projected result does not match vector projection.");
     }
 }

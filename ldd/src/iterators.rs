@@ -120,13 +120,11 @@ mod tests
         let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
 
-        // Check that the number of iterations matches the number of elements in the set.
-        assert!(iter(&storage, &ldd).count() == set.len());
+        assert!(iter(&storage, &ldd).count() == set.len(), "Number of iterations does not match the number of elements in the set.");
 
-        // Every iterated element must be in the set.
         for vector in iter(&storage, &ldd)
         {
-            assert!(set.contains(&vector));
+            assert!(set.contains(&vector), "Found element not in the set.");
         }
     }
 }

@@ -46,7 +46,7 @@ impl PartialEq for Ldd
 {
     fn eq(&self, other: &Self) -> bool
     {
-        assert!(Rc::ptr_eq(&self.storage, &other.storage)); // Both LDDs should refer to the same storage.
+        assert!(Rc::ptr_eq(&self.storage, &other.storage), "Both LDDs should refer to the same storage."); 
         self.index == other.index
     }
 }
@@ -156,18 +156,16 @@ impl Storage
     /// Create a new LDD node(value, down, right)
     pub fn insert(&mut self, value: u64, down: &Ldd, right: &Ldd) -> Ldd
     {
-        // Check the validity of the down and right nodes.
-        assert_ne!(down, self.empty_set());
-        assert_ne!(right, self.empty_vector()); 
-        assert!(down.index < self.shared.borrow().table.len());
-        assert!(right.index < self.shared.borrow().table.len());
+        // These invariants ensure that the result is a valid LDD.
+        assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
+        assert_ne!(right, self.empty_vector(), "right node can never be the empty vector."); 
+        assert!(down.index < self.shared.borrow().table.len(), "down node not in table.");
+        assert!(right.index < self.shared.borrow().table.len(), "right not not in table.");
 
         if right != self.empty_set()
         {
-            // Check that our height matches the right LDD.
-            assert_eq!(self.height[down.index] + 1, self.height[right.index]);
-            // Check that our value is less then the right value.
-            assert!(value < self.value(right));
+            assert_eq!(self.height[down.index] + 1, self.height[right.index], "height should match the right node height.");
+            assert!(value < self.value(right), "value should be less than right node value.");
         }
 
         let new_node = Node::new(value, down.index, right.index);
@@ -249,20 +247,19 @@ impl Storage
             {
                 self.free.push(index);
 
-                // Insert garbage values so an error is produced when it is used.
+                // Insert garbage values so that the LDD is invalid (down node is empty set).
                 node.value = 0;
                 node.down = 0;
                 node.right = 0;
             }
         }        
 
-        // Check that freed nodes do not occur in any other LDD.
         for garbage in self.free.iter()
         {
             for node in self.shared.borrow().table.iter()
             {
-                assert_ne!(node.down, *garbage);
-                assert_ne!(node.right, *garbage);
+                assert_ne!(node.down, *garbage, "Garbage node should not occur in table.");
+                assert_ne!(node.right, *garbage, "Garbage node should not occur in table.");
             }
         }
     }
@@ -282,22 +279,21 @@ impl Storage
     /// The value of an LDD node(value, down, right), i.e., cannot be 'true' or 'false.
     pub fn value(&self, ldd: &Ldd) -> u64
     {
-        assert_ne!(ldd, self.empty_set());
-        assert_ne!(ldd, self.empty_vector()); 
+        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
         self.shared.borrow().table[ldd.index].value
     }
 
     /// Returns a Data tuple for the given LDD node(value, down, right), i.e., cannot be 'true' or 'false.
     pub fn get(&self, ldd: &Ldd) -> Data
     {
-        assert_ne!(ldd, self.empty_set());
-        assert_ne!(ldd, self.empty_vector());         
+        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");         
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
             // Ensure that this node is valid as garbage collection will insert garbage values.
-            assert_ne!(node.down, 0);
-            assert_ne!(node.right, 1); 
+            assert!(node.down != 0 && node.right != 1, "This is a term that should not have been garbage collected");
 
             data = (node.value, node.down, node.right);
         }
