@@ -564,57 +564,32 @@ mod tests
         let set = random_vector_set(32, 10, 10);        
         let relation = random_vector_set(32, 4, 10);
 
-        // Pick read and write parameters. (maybe randomise)
-        let read_proj: Vec<u64> = random_vector(2,10);
-        let write_proj: Vec<u64> = random_vector(2,10);
+        // Pick arbitrary read and write parameters in order.
+        let read_proj = random_sorted_vector(2,9);
+        let write_proj = random_sorted_vector(2,9);
 
         // The indices of the input vectors do not match the indices in the relation. The input vector is defined for all values, but the relation only
         // for relevant positions.
-        let mut read_rel_proj: Vec<u64> = Vec::new();
-        let mut write_rel_proj: Vec<u64> = Vec::new();
+        let (read_rel_proj, write_rel_proj) = {
+            let mut read_rel_proj: Vec<u64> = Vec::new();
+            let mut write_rel_proj: Vec<u64> = Vec::new();
 
-        let mut current = 0;
-        for i in 0..10 
-        {
-            if read_proj.contains(&(i as u64)) {
-                read_rel_proj.push(current);
-                current += 1;
-            }
-            
-            if  write_proj.contains(&(i as u64)) {
-                write_rel_proj.push(current);
-                current += 1;
-            }
-        }
-
-
-        // Compute relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
-        let mut expected: HashSet<Vec<u64>> = HashSet::new();
-        for x in set.iter()
-        {
-            'next: for rel in relation.iter()
+            let mut current = 0;
+            for i in 0..10 
             {
-                let mut value: Vec<u64> = x.clone(); // The resulting vector.
-                let x_prime = project_vector(&rel, &read_rel_proj);
-                let y_prime = project_vector(&rel, &write_rel_proj);
-
-                // Ensure that project(x, read_proj) = x'
-                for (i, r) in read_proj.iter().enumerate()
-                {
-                    if value[*r as usize] != x_prime[i] {
-                        continue 'next;
-                    }
+                if read_proj.contains(&(i as u64)) {
+                    read_rel_proj.push(current);
+                    current += 1;
                 }
-
-                // Compute x[write_proj := y']
-                for (i, w) in write_proj.iter().enumerate()
-                {
-                    value[*w as usize] = y_prime[i];
+                
+                if  write_proj.contains(&(i as u64)) {
+                    write_rel_proj.push(current);
+                    current += 1;
                 }
-
-                expected.insert(value);
             }
-        }
+
+            (read_rel_proj, write_rel_proj)
+        };
 
         // Compute LDD result.
         let ldd = from_iter(&mut storage, set.iter());
@@ -631,11 +606,45 @@ mod tests
         eprintln!("meta = {}",  fmt_node(&storage, &meta));
         eprintln!("read {:?}, write {:?}, read_rel {:?} and write_rel {:?}", read_proj, write_proj, read_rel_proj, write_rel_proj);
 
-        for exp in expected.iter()
-        {            
-            assert!(element_of(&storage, exp, &result), "Result does not contain vector {:?}.", exp)
-        }
+        let expected = {
+            let mut expected: HashSet<Vec<u64>> = HashSet::new();
 
+            // Compute relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
+            for x in set.iter()
+            {
+                'next: for rel in relation.iter()
+                {
+                    let mut value: Vec<u64> = x.clone(); // The resulting vector.
+                    let x_prime = project_vector(&rel, &read_rel_proj);
+                    let y_prime = project_vector(&rel, &write_rel_proj);
+
+                    // Ensure that project(x, read_proj) = x'
+                    for (i, r) in read_proj.iter().enumerate()
+                    {
+                        if value[*r as usize] != x_prime[i] {
+                            continue 'next;
+                        }
+                    }
+
+                    // Compute x[write_proj := y']
+                    for (i, w) in write_proj.iter().enumerate()
+                    {
+                        value[*w as usize] = y_prime[i];
+                    }
+
+                    // Print information about the value that we are testing.
+                    eprintln!("value = {:?}, rel = {:?}", &value, &rel);
+                    eprintln!("x_prime = {:?}, y_prime = {:?}", &x_prime, &y_prime);
+
+                    assert!(element_of(&storage, &value, &result), "Result does not contain vector {:?}.", &value);
+                    expected.insert(value);
+                }
+            }
+
+            expected
+        };
+
+        // Check the other way around
         for res in iter(&storage, &result)
         {            
             assert!(expected.contains(&res), "Result unexpectedly contains vector {:?}.", res);

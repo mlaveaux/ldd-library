@@ -9,8 +9,7 @@ use rand::Rng;
 
 // These functions are only relevant for testing purposes.
 
-/// Returns a vector of the given length with random u64 values.
-/// We only generate values within 0 to 10 for testing purposes.
+/// Returns a vector of the given length with random u64 values (from 0..max_value).
 #[cfg(test)]
 pub fn random_vector(length: u64, max_value: u64) -> Vec<u64> 
 {
@@ -22,6 +21,18 @@ pub fn random_vector(length: u64, max_value: u64) -> Vec<u64>
     }
 
     vector
+}
+
+/// Returns a sorted vector of the given length with unique u64 values (from 0..max_value).
+#[cfg(test)]
+pub fn random_sorted_vector(length: u64, max_value: u64) -> Vec<u64> 
+{
+    use rand::prelude::IteratorRandom;
+
+    let mut rng = rand::thread_rng(); 
+    let mut result =(0..max_value).choose_multiple(&mut rng, length as usize);
+    result.sort();
+    result
 }
 
 /// Returns a set of 'amount' vectors where every vector has the given length.
@@ -55,7 +66,7 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
     result
 }
 
-/// Returns project(vector, proj), see[project].
+/// Returns project(vector, proj), see [project]. Requires proj to be sorted.
 #[cfg(test)]
 pub fn project_vector(vector: &[u64], proj: &[u64]) -> Vec<u64>
 {
