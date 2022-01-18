@@ -99,6 +99,20 @@ impl Node
     }
 }
 
+/// Returns the height of the LDD tree.
+fn height(storage: &Storage, ldd: &Ldd) -> u64
+{
+    if ldd == storage.empty_set() || ldd == storage.empty_vector() {
+        0
+    }
+    else {
+        // Since all children have the same height we only have to look at the down node.
+        let Data(_, down, _) = storage.get(ldd);
+
+        height(storage, &down) + 1        
+    }
+}
+
 /// This is the user-facing data of a Node.
 pub struct Data(pub u64, pub Ldd, pub Ldd);
 
@@ -112,8 +126,6 @@ pub struct Storage
     free: Vec<usize>, // A list of free nodes.
     empty_set: Ldd,
     empty_vector: Ldd,
-    
-    height: Vec<u64>, // Used for debugging to ensure that the created LDDs are valid.
 }
 
 /// Gives every node shared access to their reference counter.
@@ -145,9 +157,7 @@ impl Storage
         Self { 
             index: HashMap::new(),
             shared: shared.clone(),
-            // Only used for debugging purposes. height(false) = 0 and height(true) = 0, note that height(false) is irrelevant
             free: vec![],
-            height: vec![0, 0],
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
@@ -164,7 +174,7 @@ impl Storage
 
         if right != self.empty_set()
         {
-            assert_eq!(self.height[down.index] + 1, self.height[right.index], "height should match the right node height.");
+            assert_eq!(height(self, down) + 1, height(self, right), "height should match the right node height.");
             assert!(value < self.value(right), "value should be less than right node value.");
         }
 
@@ -180,13 +190,11 @@ impl Storage
                     Some(index) => {
                         // Reuse existing position in table.
                         self.shared.borrow_mut().table[index] = node;
-                        self.height[index] = self.height[down.index] + 1;
                         index
                     }
                     None => {
                         // No free positions so insert new.
                         self.shared.borrow_mut().table.push(node);
-                        self.height.push(self.height[down.index] + 1);
                         self.shared.borrow().table.len() - 1
                     }
                 }
