@@ -323,7 +323,7 @@ impl SharedStorage
 mod tests
 {
     use super::*;
-    use crate::common::*;
+    use crate::test_utility::*;
     use crate::operations::singleton;
 
     #[test]

@@ -1,4 +1,3 @@
-/*
 use reach::Config;
 use reach::run;
 
@@ -18,4 +17,3 @@ fn test_anderson()
         assert_eq!(result, 29641, "Number of states does not match expected amount.");
     }
 }
-*/

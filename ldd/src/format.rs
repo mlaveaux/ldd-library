@@ -6,11 +6,11 @@ use std::io::Write;
 use std::collections::HashSet;
 
 /// Print the vector set represented by the LDD.
-pub fn fmt_node(storage: &Storage, ldd: Ldd) -> Display
+pub fn fmt_node<'a>(storage: &'a Storage, ldd: &Ldd) -> Display<'a>
 {
     Display {
         storage,
-        ldd,
+        ldd: ldd.clone(),
     }
 }
 
@@ -47,6 +47,7 @@ pub struct Display<'a>
     storage: &'a Storage,
     ldd: Ldd,
 }
+
 impl fmt::Display for Display<'_>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
