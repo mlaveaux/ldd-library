@@ -16,7 +16,7 @@ impl Ldd
     fn new(storage: &Rc<RefCell<SharedStorage>>, index: usize) -> Ldd
     {
         let result = Ldd { storage: Rc::clone(storage), index };
-        storage.borrow_mut().protect(&result);
+        storage.borrow_mut().protect( &result, Rc::strong_count(&storage));
         result
     }
 
@@ -133,6 +133,7 @@ pub struct SharedStorage
 {    
     table: Vec<Node>,
     reference_count_changes: u64, // The number of times reference counters are changed.
+    max_references: usize, // The maximum number of references to the shared storage.
 }
 
 impl Default for Storage {
@@ -145,7 +146,7 @@ impl Storage
 {
     pub fn new() -> Self
     {
-        let shared = Rc::new(RefCell::new(SharedStorage { table: vec![], reference_count_changes: 0 }));
+        let shared = Rc::new(RefCell::new(SharedStorage { table: vec![], reference_count_changes: 0, max_references: 0 }));
         let vector = vec![
                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
                 Node::new(0, 0, 0),
@@ -310,12 +311,24 @@ impl Storage
     }
 }
 
+impl Drop for Storage
+{
+    fn drop(&mut self)
+    {
+        println!("There were {} reference count changes.", self.shared.borrow().reference_count_changes);
+        println!("There were at most {} references to storage.", self.shared.borrow().max_references);
+    }
+}
+
+use std::cmp;
+
 impl SharedStorage
 {
     /// Protect the given ldd to prevent garbage collection.
-    fn protect(&mut self, ldd: &Ldd)
+    fn protect(&mut self, ldd: &Ldd, count: usize)
     {
         self.reference_count_changes += 1;
+        self.max_references = cmp::max(self.max_references, count);
         self.table[ldd.index].reference_count += 1;
     }
     
