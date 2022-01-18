@@ -28,7 +28,7 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
         todo = ldd::minus(&mut storage, &todo1, &states);
         states = ldd::union(&mut storage, &states, &todo);
 
-        eprintln!("iteration {}, |todo| = {}", iteration, ldd::len(&storage, &todo));
+        eprintln!("iteration {}", iteration);
         iteration += 1;
     }
 
