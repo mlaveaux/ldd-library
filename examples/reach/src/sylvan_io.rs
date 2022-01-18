@@ -43,7 +43,10 @@ impl SylvanReader
           let value = u32::from_le_bytes(bytes);
 
           let copy = right & 0x10000;
-          assert_eq!(copy, 0); // We do not yet handle copy nodes.
+          if copy != 0
+          {
+              panic!("We do not yet deal with copy nodes.");
+          }
           
           let down = self.node_from_index(storage, down);
           let right = self.node_from_index(storage, right);
