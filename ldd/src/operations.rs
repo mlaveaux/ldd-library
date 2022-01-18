@@ -246,13 +246,12 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                         relational_product(storage, &set_right, rel, meta)                        
                     }                    
                     Ordering::Equal => {
-                        eprintln!("Matched {}", set_value);
                         let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
                         let right_result = relational_product(storage, &set_right, &rel_right, meta);
                         union(storage, &down_result, &right_result)
                     }
                     Ordering::Greater => {
-                        relational_product(storage, &set, &rel_right, meta)
+                        relational_product(storage, set, &rel_right, meta)
                     }
                 }
             }
@@ -264,12 +263,10 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                 let right_result = relational_product(storage, set, &rel_right, meta);
                 if down_result == *storage.empty_set()
                 {
-                    eprintln!("Down is empty");
                     right_result
                 } 
                 else 
                 {
-                    eprintln!("Wrote {}", rel_value);
                     storage.insert(rel_value, &down_result, &right_result)
                 }
             }

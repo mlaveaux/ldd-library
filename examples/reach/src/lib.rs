@@ -14,23 +14,28 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
 
     let mut todo = initial_state.clone();
     let mut states = initial_state; // The state space.
+    let mut iteration = 0;
 
     while todo != *storage.empty_set()
     {
-        let todo1 = storage.empty_set().clone();
+        let mut todo1 = storage.empty_set().clone();
         for transition in transitions.iter()
         {
             let result = ldd::relational_product(&mut storage, &todo, &transition.relation, &transition.meta);
-            ldd::union(&mut storage, &todo1, &result);
+            todo1 = ldd::union(&mut storage, &todo1, &result);
         }
 
         todo = ldd::minus(&mut storage, &todo1, &states);
         states = ldd::union(&mut storage, &states, &todo);
+
+        eprintln!("iteration {}, |todo| = {}", iteration, ldd::len(&storage, &todo));
+        iteration += 1;
     }
 
-    println!("The model has {} states", ldd::len(&storage, &states));
+    let num_of_states = ldd::len(&storage, &states);
+    println!("The model has {} states", num_of_states);
 
-    Ok(ldd::len(&storage, &states))
+    Ok(num_of_states)
 }
 
 pub struct Config

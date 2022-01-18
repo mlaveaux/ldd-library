@@ -144,7 +144,6 @@ pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ld
     for _ in 0..num_transitions
     {
         let (read_proj, write_proj) = read_projection(&mut file)?;
-
         transitions.push(
             Transition {
                 relation: storage.empty_set().clone(),
