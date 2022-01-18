@@ -62,11 +62,11 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
 {
     assert_ne!(proj, storage.empty_set(), "proj must be a singleton");
 
-    if set == storage.empty_set()  {
-        storage.empty_set().clone()
-    } else if proj == storage.empty_vector() {
+    if proj == storage.empty_vector() {
         // If meta is not defined then the rest is not in the projection (proj is always zero)
         storage.empty_vector().clone()
+    } else if set == storage.empty_set() {
+        storage.empty_set().clone()
     } else {
         assert_ne!(set, storage.empty_vector(), "proj can be at most as high as set");
 
@@ -127,6 +127,7 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 
         if read && write {
             meta.push(3);
+            meta.push(4);
         }
         else if read {
             meta.push(1);
@@ -151,18 +152,18 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 ///     - 0 = not part the relation.
 ///     - 1 = only in read_proj
 ///     - 2 = only in write_proj
-///     - 3 = both in read_proj and write_proj
+///     - 3 = in both read_proj and write_proj (read phase)
+///     - 4 = in both read_proj and write_proj (write phase)
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
     assert_ne!(meta, storage.empty_set());
 
-    if set == storage.empty_set() || rel == storage.empty_set() {
-        storage.empty_set().clone()
-    } else if meta == storage.empty_vector() {
+    if meta == storage.empty_vector() {
         // If meta is not defined then the rest is not in the relation (meta is always zero)
         set.clone()
+    } else if set == storage.empty_set() || rel == storage.empty_set() {
+        storage.empty_set().clone()
     } else {
-
         let Data(meta_value, meta_down, _) = storage.get(meta);
 
         let result = match meta_value
@@ -233,6 +234,42 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                 } 
                 else 
                 {
+                    storage.insert(rel_value, &down_result, &right_result)
+                }
+            }
+            3 => {
+                let Data(set_value, set_down, set_right) = storage.get(set);
+                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                
+                match set_value.cmp(&rel_value) {
+                    Ordering::Less => {
+                        relational_product(storage, &set_right, rel, meta)                        
+                    }                    
+                    Ordering::Equal => {
+                        eprintln!("Matched {}", set_value);
+                        let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
+                        let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                        union(storage, &down_result, &right_result)
+                    }
+                    Ordering::Greater => {
+                        relational_product(storage, &set, &rel_right, meta)
+                    }
+                }
+            }
+            4 => {                
+                // Write the values present in the relation.
+                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+
+                let down_result = relational_product(storage, set, &rel_down, &meta_down);
+                let right_result = relational_product(storage, set, &rel_right, meta);
+                if down_result == *storage.empty_set()
+                {
+                    eprintln!("Down is empty");
+                    right_result
+                } 
+                else 
+                {
+                    eprintln!("Wrote {}", rel_value);
                     storage.insert(rel_value, &down_result, &right_result)
                 }
             }
@@ -354,7 +391,8 @@ pub fn len(storage: &Storage, set: &Ldd) -> usize
 mod tests
 {
     use super::*;    
-    use crate::common::*;
+    use crate::fmt_node;
+    use crate::test_utility::*;
 
     use std::collections::HashSet;
     use std::ops::Sub;
@@ -516,6 +554,92 @@ mod tests
 
         // relational_product(R, S, [], write_proj) = { x[write_proj := y'] | (<>, y') in R and x in S }
         assert_eq!(write_project, relation);
+    }
+
+    #[test]
+    fn random_relational_product()
+    {
+        let mut storage = Storage::new();      
+
+        let set = random_vector_set(32, 10, 10);        
+        let relation = random_vector_set(32, 4, 10);
+
+        // Pick read and write parameters. (maybe randomise)
+        let read_proj: Vec<u64> = random_vector(2,10);
+        let write_proj: Vec<u64> = random_vector(2,10);
+
+        // The indices of the input vectors do not match the indices in the relation. The input vector is defined for all values, but the relation only
+        // for relevant positions.
+        let mut read_rel_proj: Vec<u64> = Vec::new();
+        let mut write_rel_proj: Vec<u64> = Vec::new();
+
+        let mut current = 0;
+        for i in 0..10 
+        {
+            if read_proj.contains(&(i as u64)) {
+                read_rel_proj.push(current);
+                current += 1;
+            }
+            
+            if  write_proj.contains(&(i as u64)) {
+                write_rel_proj.push(current);
+                current += 1;
+            }
+        }
+
+
+        // Compute relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
+        let mut expected: HashSet<Vec<u64>> = HashSet::new();
+        for x in set.iter()
+        {
+            'next: for rel in relation.iter()
+            {
+                let mut value: Vec<u64> = x.clone(); // The resulting vector.
+                let x_prime = project_vector(&rel, &read_rel_proj);
+                let y_prime = project_vector(&rel, &write_rel_proj);
+
+                // Ensure that project(x, read_proj) = x'
+                for (i, r) in read_proj.iter().enumerate()
+                {
+                    if value[*r as usize] != x_prime[i] {
+                        continue 'next;
+                    }
+                }
+
+                // Compute x[write_proj := y']
+                for (i, w) in write_proj.iter().enumerate()
+                {
+                    value[*w as usize] = y_prime[i];
+                }
+
+                expected.insert(value);
+            }
+        }
+
+        // Compute LDD result.
+        let ldd = from_iter(&mut storage, set.iter());
+        let rel = from_iter(&mut storage, relation.iter());
+
+        let meta = compute_meta(&mut storage, &read_proj, &write_proj);
+        let result = relational_product(&mut storage, &ldd, &rel, &meta);
+
+        eprintln!("set = {}",  fmt_node(&storage, &ldd));
+        eprintln!("relation = {}",  fmt_node(&storage, &rel));
+        eprintln!("result = {}",  fmt_node(&storage, &result));
+        eprintln!("========");
+
+        eprintln!("meta = {}",  fmt_node(&storage, &meta));
+        eprintln!("read {:?}, write {:?}, read_rel {:?} and write_rel {:?}", read_proj, write_proj, read_rel_proj, write_rel_proj);
+
+        for exp in expected.iter()
+        {            
+            assert!(element_of(&storage, exp, &result), "Result does not contain vector {:?}.", exp)
+        }
+
+        for res in iter(&storage, &result)
+        {            
+            assert!(expected.contains(&res), "Result unexpectedly contains vector {:?}.", res);
+        }
     }
 
     // Test the project function with random inputs.
