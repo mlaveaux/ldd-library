@@ -34,7 +34,7 @@ mod storage;
 mod operations;
 mod format;
 mod iterators;
-mod common;
+mod test_utility;
 
 pub use storage::*;
 pub use operations::*;

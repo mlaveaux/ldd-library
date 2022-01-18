@@ -54,3 +54,15 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
 
     result
 }
+
+/// Returns project(vector, proj), see[project].
+#[cfg(test)]
+pub fn project_vector(vector: &[u64], proj: &[u64]) -> Vec<u64>
+{
+    let mut result = Vec::<u64>::new();
+    for i in proj
+    {
+        result.push(vector[*i as usize]);
+    }
+    result
+}
