@@ -9,9 +9,8 @@ edition = "2021"
 rand = "0.8.4"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = { version = "0.3", features = ["html_reports"] }
 
 [[bench]]
 name = "operation_benchmarks"
 harness = false
-html_reports = true
