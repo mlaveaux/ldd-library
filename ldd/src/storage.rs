@@ -301,7 +301,6 @@ impl Storage
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
-            // Ensure that this node is valid as garbage collection will insert garbage values.
             assert!(node.down != 0 && node.right != 1, "This is a term that should not have been garbage collected");
 
             data = (node.value, node.down, node.right);

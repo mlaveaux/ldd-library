@@ -46,9 +46,7 @@ pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
     singleton(storage, &result)
 }
 
-/// Computes the set of vectors projected onto the given indices, 
-/// 
-/// Let 'proj' be equal to compute_proj([i_0, ..., i_k]).
+/// Computes the set of vectors projected onto the given indices, where proj is equal to compute_proj([i_0, ..., i_k]).
 /// 
 /// Formally, for a single vector <x_0, ..., x_n> we have that:
 ///     - project(<x_0, ..., x_n>, i_0 < ... < i_k) = <x_(i_0), ..., x_(i_k)>
@@ -156,7 +154,7 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 ///     - 4 = in both read_proj and write_proj (write phase)
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
-    assert_ne!(meta, storage.empty_set());
+    assert_ne!(meta, storage.empty_set(), "proj must be a singleton");
 
     if meta == storage.empty_vector() {
         // If meta is not defined then the rest is not in the relation (meta is always zero)
@@ -409,28 +407,28 @@ mod tests
         // All elements in the set should be contained in the ldd.
         for expected in &set
         {
-            assert!(element_of(&storage, &expected, &ldd));
+            assert!(element_of(&storage, &expected, &ldd), "Did not find expected vector in ldd");
         }
 
         // No shorter vectors should be contained in the ldd (try several times).
         for _ in 0..10
         {
             let short_vector = random_vector(rng.gen_range(0..length), 10);
-            assert!(!element_of(&storage, &short_vector, &ldd));
+            assert!(!element_of(&storage, &short_vector, &ldd), "Found shorter vector in ldd.");
         }
 
         // No longer vectors should be contained in the ldd.
         for _ in 0..10
         {
             let short_vector = random_vector(rng.gen_range(length+1..20), 10);
-            assert!(!element_of(&storage, &short_vector, &ldd));
+            assert!(!element_of(&storage, &short_vector, &ldd), "Found longer vector in ldd");
         }
 
         // Try vectors of correct size with both the set and ldd.
         for _ in 0..10
         {
             let vector = random_vector(length, 10);
-            assert_eq!(set.contains(&vector), element_of(&storage, &vector, &ldd));
+            assert_eq!(set.contains(&vector), element_of(&storage, &vector, &ldd), "Set contains did not match ldd element_of");
         }
     }
 
@@ -442,12 +440,12 @@ mod tests
 
         let set_a = random_vector_set(32, 10, 10);
         let set_b = random_vector_set(32, 10, 10);
+        let expected = from_iter(&mut storage, set_a.union(&set_b));
 
         let a = from_iter(&mut storage, set_a.iter());
         let b = from_iter(&mut storage, set_b.iter());
         let result = union(&mut storage, &a, &b);
 
-        let expected = from_iter(&mut storage, set_a.union(&set_b));
         assert_eq!(result, expected);
     }
     
@@ -460,11 +458,11 @@ mod tests
 
         let ldd = singleton(&mut storage, &vector[..]);
 
-        // Check that ldd contains exactly vector that is equal to the vector.
+        // Check that ldd contains exactly one vector that is equal to the initial vector.
         let mut it = iter(&storage, &ldd);
         let result = it.next().unwrap();
-        assert_eq!(vector, result);
-        assert_eq!(it.next(), None); // No other vectors.
+        assert_eq!(vector, result, "Contained vector did not match expected");
+        assert_eq!(it.next(), None, "The ldd should not contain any other vector");
     }
 
     // Test the len function with random inputs.
@@ -476,7 +474,7 @@ mod tests
         let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
 
-        assert_eq!(set.len(), len(&storage, &ldd));
+        assert_eq!(set.len(), len(&storage, &ldd), "Length did not match expected set");
     }
 
     // Test the minus function with random inputs.
