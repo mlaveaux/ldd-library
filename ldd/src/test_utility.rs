@@ -1,16 +1,11 @@
-#[cfg(test)]
 use crate::{Ldd, Storage, operations::*};
 
-#[cfg(test)]
 use std::collections::HashSet;
-
-#[cfg(test)]
 use rand::Rng;
 
-// These functions are only relevant for testing purposes.
+///! Functions in this module are only relevant for testing purposes.
 
 /// Returns a vector of the given length with random u64 values (from 0..max_value).
-#[cfg(test)]
 pub fn random_vector(length: u64, max_value: u64) -> Vec<u64> 
 {
     let mut rng = rand::thread_rng();    
@@ -24,19 +19,17 @@ pub fn random_vector(length: u64, max_value: u64) -> Vec<u64>
 }
 
 /// Returns a sorted vector of the given length with unique u64 values (from 0..max_value).
-#[cfg(test)]
 pub fn random_sorted_vector(length: u64, max_value: u64) -> Vec<u64> 
 {
     use rand::prelude::IteratorRandom;
 
     let mut rng = rand::thread_rng(); 
-    let mut result =(0..max_value).choose_multiple(&mut rng, length as usize);
+    let mut result = (0..max_value).choose_multiple(&mut rng, length as usize);
     result.sort();
     result
 }
 
 /// Returns a set of 'amount' vectors where every vector has the given length.
-#[cfg(test)]
 pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<Vec<u64>>
 {
     let mut result: HashSet<Vec<u64>> = HashSet::new();
@@ -51,7 +44,6 @@ pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<V
 }
 
 /// Returns an LDD containing all elements of the given iterator over vectors.
-#[cfg(test)]
 pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
     where I: Iterator<Item = &'a Vec<u64>>
 {
@@ -67,7 +59,6 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
 }
 
 /// Returns project(vector, proj), see [project]. Requires proj to be sorted.
-#[cfg(test)]
 pub fn project_vector(vector: &[u64], proj: &[u64]) -> Vec<u64>
 {
     let mut result = Vec::<u64>::new();

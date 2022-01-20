@@ -34,6 +34,8 @@ mod storage;
 mod operations;
 mod format;
 mod iterators;
+
+#[cfg(test)]
 mod test_utility;
 
 pub use storage::*;
