@@ -65,6 +65,12 @@ pub fn criterion_benchmark(c: &mut Criterion)
             })
         });
 }
+ 	
+mod perf;
 
+#[cfg(pprof)]
+criterion_group!(benches, criterion_benchmark(Criterion::default().with_profiler(perf::FlamegraphProfiler::new(100))));
+
+#[cfg(not(pprof))]
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);

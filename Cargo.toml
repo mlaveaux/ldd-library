@@ -4,5 +4,6 @@ debug = true
 [workspace]
 members = [
     "examples/*",
+    "benchmarks",
     "ldd",
 ]
