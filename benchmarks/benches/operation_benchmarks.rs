@@ -16,6 +16,16 @@ pub fn random_vector(length: u64, max_value: u64) -> Vec<u64>
     vector
 }
 
+/// Returns a sorted vector of the given length with unique u64 values (from 0..max_value).
+pub fn random_sorted_vector(length: u64, max_value: u64) -> Vec<u64> 
+{
+    use rand::prelude::IteratorRandom;
+
+    let mut rng = rand::thread_rng(); 
+    let mut result = (0..max_value).choose_multiple(&mut rng, length as usize);
+    result.sort();
+    result
+}
 
 /// Returns a set of 'amount' vectors where every vector has the given length.
 pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<Vec<u64>>
@@ -47,7 +57,7 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) 
-{    
+{        
     let mut storage = Storage::new();
 
     c.bench_function("union 1000", 
@@ -62,6 +72,48 @@ pub fn criterion_benchmark(c: &mut Criterion)
                 let b = from_iter(&mut storage, set_b.iter());
             
                 black_box(union(&mut storage, &a, &b));
+            })
+        });
+
+    drop(storage);
+    let mut storage = Storage::new();
+        
+    c.bench_function("minus 1000", 
+    |bencher| 
+        {
+            bencher.iter(
+            || {
+                let set_a = random_vector_set(1000, 10, 10);
+                let set_b = random_vector_set(1000, 10, 10);
+            
+                let a = from_iter(&mut storage, set_a.iter());
+                let b = from_iter(&mut storage, set_b.iter());
+            
+                black_box(minus(&mut storage, &a, &b));
+            })
+        });
+        
+    drop(storage);
+    let mut storage = Storage::new();
+
+    c.bench_function("relational_product 1000", 
+    |bencher| 
+        {
+            bencher.iter(
+            || {
+                let set = random_vector_set(1000, 10, 10);        
+                let relation = random_vector_set(32, 4, 10);
+
+                // Pick arbitrary read and write parameters in order.
+                let read_proj = random_sorted_vector(2,9);
+                let write_proj = random_sorted_vector(2,9);
+
+                // Compute LDD result.
+                let ldd = from_iter(&mut storage, set.iter());
+                let rel = from_iter(&mut storage, relation.iter());
+
+                let meta = compute_meta(&mut storage, &read_proj, &write_proj);
+                black_box(relational_product(&mut storage, &ldd, &rel, &meta));
             })
         });
 }
