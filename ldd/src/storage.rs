@@ -301,7 +301,7 @@ impl Storage
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
-            assert!(node.down != 0 && node.right != 1, "This is a term that should not have been garbage collected");
+            assert!(is_valid(node), "This is a term that should not have been garbage collected");
 
             data = (node.value, node.down, node.right);
         }
@@ -310,6 +310,11 @@ impl Storage
     }
 }
 
+/// Returns false if the node has been garbage collected.
+fn is_valid(node: &Node) -> bool
+{
+    return !(node.down == 0 && node.right == 1);
+}
 impl Drop for Storage
 {
     fn drop(&mut self)
