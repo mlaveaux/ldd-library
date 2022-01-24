@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher, BuildHasherDefault};
+use rustc_hash::FxHasher;
 
 use crate::operations::height;
 
@@ -47,7 +48,8 @@ impl Eq for Node {}
 
 impl Hash for Node
 {    
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) 
+    {
         self.value.hash(state);
         self.down.hash(state);
         self.right.hash(state);
@@ -63,7 +65,7 @@ pub struct Data(pub u64, pub Ldd, pub Ldd);
 pub struct Storage
 {
     shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
-    index: HashMap<Node, usize>,
+    index: HashMap<Node, usize, BuildHasherDefault<FxHasher>>,
     free: Vec<usize>, // A list of free nodes.
 
     count_until_collection: u64, // Count down until the next garbage collection.
@@ -92,7 +94,7 @@ impl Storage
         shared.borrow_mut().table = vector;
 
         Self { 
-            index: HashMap::new(),
+            index: HashMap::default(),
             shared: shared.clone(),
             free: vec![],
             count_until_collection: 10000,
