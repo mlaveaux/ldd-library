@@ -67,6 +67,7 @@ pub struct Storage
     free: Vec<usize>, // A list of free nodes.
 
     count_until_collection: u64, // Count down until the next garbage collection.
+    enable_garbage_collection: bool, // Whether to enable automatic garbage collection based on heuristics.
     empty_set: Ldd,
     empty_vector: Ldd,
 }
@@ -95,6 +96,7 @@ impl Storage
             shared: shared.clone(),
             free: vec![],
             count_until_collection: 10000,
+            enable_garbage_collection: true,
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
@@ -117,7 +119,10 @@ impl Storage
         
         if self.count_until_collection == 0 
         {
-            self.garbage_collect();
+            if self.enable_garbage_collection 
+            {
+                self.garbage_collect();
+            }
             self.count_until_collection = self.shared.borrow().table.len() as u64;
         }
 
@@ -181,6 +186,10 @@ impl Storage
         }
 
         println!("Collected {} elements", self.free.len());
+    /// Enables automatic garbage collection, which is enabled by default.
+    pub fn enable_garbage_collection(&mut self, enabled: bool)
+    {
+        self.enable_garbage_collection = enabled;
     }
 
     /// The 'false' LDD.
