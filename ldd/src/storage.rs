@@ -124,6 +124,8 @@ pub struct Storage
     shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
     index: HashMap<Node, usize>,
     free: Vec<usize>, // A list of free nodes.
+
+    count_until_collection: u64, // Count down until the next garbage collection.
     empty_set: Ldd,
     empty_vector: Ldd,
 }
@@ -159,6 +161,7 @@ impl Storage
             index: HashMap::new(),
             shared: shared.clone(),
             free: vec![],
+            count_until_collection: 100,
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
@@ -178,6 +181,11 @@ impl Storage
             assert_eq!(height(self, down) + 1, height(self, right), "height should match the right node height.");
             assert!(value < self.value(right), "value should be less than right node value.");
         }
+        
+        if self.count_until_collection == 0 
+        {
+            self.garbage_collect();
+        }
 
         let new_node = Node::new(value, down.index, right.index);
         Ldd::new(&self.shared,
@@ -185,6 +193,7 @@ impl Storage
             || 
             {
                 let node = Node::new(value, down.index, right.index);
+                self.count_until_collection = self.count_until_collection - 1;
 
                 match self.free.pop()
                 {
@@ -259,7 +268,7 @@ impl Storage
                 // Insert garbage values so that the LDD is invalid (down node is empty set).
                 node.value = 0;
                 node.down = 0;
-                node.right = 0;
+                node.right = 1;
             }
         }        
 
