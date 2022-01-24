@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::cmp;
 
 /// Every LDD instance points to its root node in the storage.
 pub struct Ldd
@@ -17,6 +18,7 @@ impl Ldd
     {
         let result = Ldd { storage: Rc::clone(storage), index };
         storage.borrow_mut().protect( &result, Rc::strong_count(&storage));
+        assert!(is_valid(&storage.borrow().table[index]), "Node {} should not have been garbage collected", index);
         result
     }
 
@@ -185,6 +187,7 @@ impl Storage
         if self.count_until_collection == 0 
         {
             self.garbage_collect();
+            self.count_until_collection = 10000;
         }
 
         let new_node = Node::new(value, down.index, right.index);
@@ -199,8 +202,12 @@ impl Storage
                 {
                     Some(index) => {
                         // Reuse existing position in table.
-                        self.shared.borrow_mut().table[index] = node;
-                        index
+                        //self.shared.borrow_mut().table[index] = node;
+                        //index
+                        
+                        // No free positions so insert new.
+                        self.shared.borrow_mut().table.push(node);
+                        self.shared.borrow().table.len() - 1
                     }
                     None => {
                         // No free positions so insert new.
@@ -216,9 +223,9 @@ impl Storage
     /// Mark all LDDs reachable from the given root index.
     fn mark_node(&mut self, root: usize)
     {
-        let table = &mut self.shared.borrow_mut().table;
         let mut stack: Vec<usize> = vec![root];
-
+        let table = &mut self.shared.borrow_mut().table;
+    
         while let Some(current) = stack.pop()
         {            
             let node = &mut table[current];
@@ -229,33 +236,31 @@ impl Storage
             else
             {
                 node.marked = true;
-                stack.push(node.down);
-                stack.push(node.right);
+                if current != 0 && current != 1 {
+                    stack.push(node.down);
+                    stack.push(node.right);
+                }
             }
         }
-    }
+    }    
 
     /// Cleans up all LDDs that are unreachable from the root LDDs.
     pub fn garbage_collect(&mut self)
     {
-        let mut roots: Vec<usize> = vec![];
+        println!("Collecting garbage...");
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
-        for (index, node) in &mut self.shared.borrow_mut().table.iter_mut().enumerate()
+        let num_of_elements = self.shared.borrow().table.len();
+        for i in 0..num_of_elements
         {
-            if node.reference_count > 0
+            if self.shared.borrow().table[i].reference_count > 0
             {
-                roots.push(index);
+                self.mark_node(i);
             }
-        }
-
-        for root in roots.iter()
-        {
-            self.mark_node(*root);
         }
         
         // Collect all garbage.
-        for (index, node) in &mut self.shared.borrow_mut().table.iter_mut().enumerate()
+        for (index, node) in self.shared.borrow_mut().table.iter_mut().enumerate()
         {
             if node.marked
             {
@@ -264,22 +269,14 @@ impl Storage
             else
             {
                 self.free.push(index);
+                self.index.remove(node);
 
                 // Insert garbage values so that the LDD is invalid (down node is empty set).
                 node.value = 0;
                 node.down = 0;
                 node.right = 1;
             }
-        }        
-
-        for garbage in self.free.iter()
-        {
-            for node in self.shared.borrow().table.iter()
-            {
-                assert_ne!(node.down, *garbage, "Garbage node should not occur in table.");
-                assert_ne!(node.right, *garbage, "Garbage node should not occur in table.");
-            }
-        }
+        } 
     }
 
     /// The 'false' LDD.
@@ -297,51 +294,55 @@ impl Storage
     /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn value(&self, ldd: &Ldd) -> u64
     {
-        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
-        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
-        self.shared.borrow().table[ldd.index].value
+        let node = &self.shared.borrow().table[ldd.index];
+        node.value
     }
 
     /// The down of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn down(&self, ldd: &Ldd) -> Ldd
     {
-        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
-        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
-        let down = self.shared.borrow().table[ldd.index].down;
-        Ldd::new(&self.shared, down)
+        self.verify_ldd(ldd);
+        let node = &self.shared.borrow().table[ldd.index];
+        Ldd::new(&self.shared, node.down)
     }
 
     /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn right(&self, ldd: &Ldd) -> Ldd
     {
-        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
-        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
-        let right = self.shared.borrow().table[ldd.index].right;
-        Ldd::new(&self.shared, right)
+        self.verify_ldd(ldd);
+        let node = &self.shared.borrow().table[ldd.index];
+        Ldd::new(&self.shared, node.right)
     }
 
     /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn get(&self, ldd: &Ldd) -> Data
     {
-        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
-        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");         
+        self.verify_ldd(ldd);     
         let data : (u64, usize, usize);
         {        
             let node = &self.shared.borrow().table[ldd.index];
-            assert!(is_valid(node), "This is a term that should not have been garbage collected");
-
             data = (node.value, node.down, node.right);
         }
 
         Data(data.0, Ldd::new(&self.shared, data.1), Ldd::new(&self.shared, data.2))
+    }
+
+    // Asserts whether the given ldd is valid.
+    fn verify_ldd(&self, ldd: &Ldd)
+    {    
+        let node = &self.shared.borrow().table[ldd.index];
+        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
+        assert!(is_valid(node), "Node {} should not have been garbage collected", ldd.index);
     }
 }
 
 /// Returns false if the node has been garbage collected.
 fn is_valid(node: &Node) -> bool
 {
-    return !(node.down == 0 && node.right == 1);
+    return !(node.down == 0 && node.right == 1); // These are values that can only be set during garbage collection.
 }
+
 impl Drop for Storage
 {
     fn drop(&mut self)
@@ -350,8 +351,6 @@ impl Drop for Storage
         println!("There were at most {} references to storage.", self.shared.borrow().max_references);
     }
 }
-
-use std::cmp;
 
 impl SharedStorage
 {
