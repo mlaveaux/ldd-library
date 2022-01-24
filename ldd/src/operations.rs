@@ -315,32 +315,7 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 /// Returns the union of the given LDDs.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    if a == b {
-        a.clone()
-    } else if a == storage.empty_set() {
-        b.clone()
-    } else if b == storage.empty_set() {
-        a.clone()
-    } else {
-        let Data(a_value, a_down, a_right) = storage.get(a);
-        let Data(b_value, b_down, b_right) = storage.get(b);
-
-        match a_value.cmp(&b_value) {
-            Ordering::Less => {
-                let result = union(storage, &a_right, b);
-                storage.insert(a_value, &a_down, &result)
-            },
-            Ordering::Equal => {
-                let down_result = union(storage, &a_down, &b_down);
-                let right_result = union(storage, &a_right, &b_right);
-                storage.insert(a_value, &down_result, &right_result)
-            },
-            Ordering::Greater => {
-                let result = union(storage, a, &b_right);
-                storage.insert(b_value, &b_down, &result)
-            }
-        }
-    }
+    union_impl(storage, a.clone(), b.clone())
 }
 
 /// Returns true iff the set contains the vector.
@@ -393,6 +368,36 @@ pub fn height(storage: &Storage, ldd: &Ldd) -> u64
         let Data(_, down, _) = storage.get(ldd);
 
         height(storage, &down) + 1        
+    }
+}
+
+fn union_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
+{
+    if a == b {
+        a
+    } else if a == *storage.empty_set() {
+        b
+    } else if b == *storage.empty_set() {
+        a
+    } else {
+        let Data(a_value, a_down, a_right) = storage.get(&a);
+        let Data(b_value, b_down, b_right) = storage.get(&b);
+
+        match a_value.cmp(&b_value) {
+            Ordering::Less => {
+                let result = union_impl(storage, a_right, b);
+                storage.insert(a_value, &a_down, &result)
+            },
+            Ordering::Equal => {
+                let down_result = union_impl(storage, a_down, b_down);
+                let right_result = union_impl(storage, a_right, b_right);
+                storage.insert(a_value, &down_result, &right_result)
+            },
+            Ordering::Greater => {
+                let result = union_impl(storage, a, b_right);
+                storage.insert(b_value, &b_down, &result)
+            }
+        }
     }
 }
 
