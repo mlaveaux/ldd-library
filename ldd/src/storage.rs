@@ -163,7 +163,7 @@ impl Storage
             index: HashMap::new(),
             shared: shared.clone(),
             free: vec![],
-            count_until_collection: 100,
+            count_until_collection: 10000,
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
@@ -187,7 +187,7 @@ impl Storage
         if self.count_until_collection == 0 
         {
             self.garbage_collect();
-            self.count_until_collection = 10000;
+            self.count_until_collection = self.shared.borrow().table.len() as u64;
         }
 
         let new_node = Node::new(value, down.index, right.index);
@@ -196,27 +196,22 @@ impl Storage
             || 
             {
                 let node = Node::new(value, down.index, right.index);
-                self.count_until_collection = self.count_until_collection - 1;
 
                 match self.free.pop()
                 {
                     Some(index) => {
                         // Reuse existing position in table.
-                        //self.shared.borrow_mut().table[index] = node;
-                        //index
-                        
-                        // No free positions so insert new.
-                        self.shared.borrow_mut().table.push(node);
-                        self.shared.borrow().table.len() - 1
+                        self.shared.borrow_mut().table[index] = node;
+                        index
                     }
                     None => {
                         // No free positions so insert new.
+                        self.count_until_collection = self.count_until_collection - 1;
                         self.shared.borrow_mut().table.push(node);
                         self.shared.borrow().table.len() - 1
                     }
                 }
-            }
-            )
+            })
         )
     }
 
@@ -276,7 +271,9 @@ impl Storage
                 node.down = 0;
                 node.right = 1;
             }
-        } 
+        }
+
+        println!("Collected {} elements", self.free.len());
     }
 
     /// The 'false' LDD.
