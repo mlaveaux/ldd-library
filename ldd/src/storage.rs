@@ -31,7 +31,7 @@ impl Node
     /// Returns false if the node has been garbage collected.
     pub fn is_valid(&self) -> bool
     {
-        return !(self.down == 0 && self.right == 1); // These are values that can only be set during garbage collection.
+        !(self.down == 0 && self.right == 1) // These are values that can only be set during garbage collection.
     }
 }
 
@@ -137,7 +137,7 @@ impl Storage
                     }
                     None => {
                         // No free positions so insert new.
-                        self.count_until_collection = self.count_until_collection - 1;
+                        self.count_until_collection -= 1;
                         self.shared.borrow_mut().table.push(node);
                         self.shared.borrow().table.len() - 1
                     }

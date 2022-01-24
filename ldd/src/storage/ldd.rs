@@ -19,8 +19,8 @@ impl Ldd
     pub fn new(storage: &Rc<RefCell<SharedStorage>>, index: usize) -> Ldd
     {
         let result = Ldd { storage: Rc::clone(storage), index };
-        storage.borrow_mut().protect( &result, Rc::strong_count(&storage));
-        debug_assert!(storage.borrow().table[index].is_valid(), "Node {} should not have been garbage collected", index);
+        storage.borrow_mut().protect( &result, Rc::strong_count(storage));
+        debug_assert!(storage.borrow().table[index].is_valid(), "Node {index} should not have been garbage collected");
         result
     }
 
@@ -115,5 +115,11 @@ impl SharedStorage
         self.table[ldd.index].reference_count -= 1;
     }
 }
+
+impl Default for SharedStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}    
 
 impl Eq for Ldd {}
