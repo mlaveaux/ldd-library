@@ -73,15 +73,6 @@ fn print(storage: &Storage, ldd: &Ldd, f: &mut fmt::Formatter<'_>) -> fmt::Resul
     Ok(())
 }
 
-use std::hash::{Hash, Hasher};
-
-impl Hash for Ldd
-{    
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index().hash(state);
-    }
-}
-
 fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, ldd: &Ldd) -> io::Result<()>
 {
     if marked.contains(ldd) || ldd == storage.empty_set() || ldd == storage.empty_vector()

@@ -382,6 +382,20 @@ pub fn len(storage: &Storage, set: &Ldd) -> usize
     }
 }
 
+/// Returns the height of the LDD tree.
+pub fn height(storage: &Storage, ldd: &Ldd) -> u64
+{
+    if ldd == storage.empty_set() || ldd == storage.empty_vector() {
+        0
+    }
+    else {
+        // Since all children have the same height we only have to look at the down node.
+        let Data(_, down, _) = storage.get(ldd);
+
+        height(storage, &down) + 1        
+    }
+}
+
 #[cfg(test)]
 mod tests
 {
