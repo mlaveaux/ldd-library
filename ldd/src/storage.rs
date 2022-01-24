@@ -285,7 +285,7 @@ impl Storage
         &self.empty_vector
     }
 
-    /// The value of an LDD node(value, down, right), i.e., cannot be 'true' or 'false.
+    /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn value(&self, ldd: &Ldd) -> u64
     {
         assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
@@ -293,7 +293,25 @@ impl Storage
         self.shared.borrow().table[ldd.index].value
     }
 
-    /// Returns a Data tuple for the given LDD node(value, down, right), i.e., cannot be 'true' or 'false.
+    /// The down of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
+    pub fn down(&self, ldd: &Ldd) -> Ldd
+    {
+        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
+        let down = self.shared.borrow().table[ldd.index].down;
+        Ldd::new(&self.shared, down)
+    }
+
+    /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
+    pub fn right(&self, ldd: &Ldd) -> Ldd
+    {
+        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
+        let right = self.shared.borrow().table[ldd.index].right;
+        Ldd::new(&self.shared, right)
+    }
+
+    /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn get(&self, ldd: &Ldd) -> Data
     {
         assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
