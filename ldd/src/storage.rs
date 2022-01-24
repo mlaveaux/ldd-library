@@ -18,7 +18,7 @@ impl Ldd
     {
         let result = Ldd { storage: Rc::clone(storage), index };
         storage.borrow_mut().protect( &result, Rc::strong_count(&storage));
-        assert!(is_valid(&storage.borrow().table[index]), "Node {} should not have been garbage collected", index);
+        debug_assert!(is_valid(&storage.borrow().table[index]), "Node {} should not have been garbage collected", index);
         result
     }
 
@@ -48,7 +48,7 @@ impl PartialEq for Ldd
 {
     fn eq(&self, other: &Self) -> bool
     {
-        assert!(Rc::ptr_eq(&self.storage, &other.storage), "Both LDDs should refer to the same storage."); 
+        debug_assert!(Rc::ptr_eq(&self.storage, &other.storage), "Both LDDs should refer to the same storage."); 
         self.index == other.index
     }
 }
@@ -173,15 +173,15 @@ impl Storage
     pub fn insert(&mut self, value: u64, down: &Ldd, right: &Ldd) -> Ldd
     {
         // These invariants ensure that the result is a valid LDD.
-        assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
-        assert_ne!(right, self.empty_vector(), "right node can never be the empty vector."); 
-        assert!(down.index < self.shared.borrow().table.len(), "down node not in table.");
-        assert!(right.index < self.shared.borrow().table.len(), "right not not in table.");
+        debug_assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
+        debug_assert_ne!(right, self.empty_vector(), "right node can never be the empty vector."); 
+        debug_assert!(down.index < self.shared.borrow().table.len(), "down node not in table.");
+        debug_assert!(right.index < self.shared.borrow().table.len(), "right not not in table.");
 
         if right != self.empty_set()
         {
-            assert_eq!(height(self, down) + 1, height(self, right), "height should match the right node height.");
-            assert!(value < self.value(right), "value should be less than right node value.");
+            debug_assert_eq!(height(self, down) + 1, height(self, right), "height should match the right node height.");
+            debug_assert!(value < self.value(right), "value should be less than right node value.");
         }
         
         if self.count_until_collection == 0 
@@ -328,9 +328,9 @@ impl Storage
     fn verify_ldd(&self, ldd: &Ldd)
     {    
         let node = &self.shared.borrow().table[ldd.index];
-        assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
-        assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
-        assert!(is_valid(node), "Node {} should not have been garbage collected", ldd.index);
+        debug_assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        debug_assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
+        debug_assert!(is_valid(node), "Node {} should not have been garbage collected", ldd.index);
     }
 }
 

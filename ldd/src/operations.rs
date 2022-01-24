@@ -58,7 +58,7 @@ pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
 /// defined otherwise.
 pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
 {
-    assert_ne!(proj, storage.empty_set(), "proj must be a singleton");
+    debug_assert_ne!(proj, storage.empty_set(), "proj must be a singleton");
 
     if proj == storage.empty_vector() {
         // If meta is not defined then the rest is not in the projection (proj is always zero)
@@ -66,7 +66,7 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
     } else if set == storage.empty_set() {
         storage.empty_set().clone()
     } else {
-        assert_ne!(set, storage.empty_vector(), "proj can be at most as high as set");
+        debug_assert_ne!(set, storage.empty_vector(), "proj can be at most as high as set");
 
         let Data(proj_value, proj_down, _) = storage.get(proj);
         let Data(value, down, right) =  storage.get(set);
@@ -154,7 +154,7 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
 ///     - 4 = in both read_proj and write_proj (write phase)
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
-    assert_ne!(meta, storage.empty_set(), "proj must be a singleton");
+    debug_assert_ne!(meta, storage.empty_set(), "proj must be a singleton");
 
     if meta == storage.empty_vector() {
         // If meta is not defined then the rest is not in the relation (meta is always zero)
