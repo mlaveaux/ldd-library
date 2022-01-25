@@ -9,6 +9,7 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
 {
     // Initialize the library.
     let mut storage = ldd::Storage::new();
+    storage.enable_performance_metrics(true);
 
     let (initial_state, transitions) = sylvan_io::load_model(&mut storage, &config.filename)?;
 
