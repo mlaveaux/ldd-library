@@ -70,6 +70,7 @@ pub struct Storage
 
     count_until_collection: u64, // Count down until the next garbage collection.
     enable_garbage_collection: bool, // Whether to enable automatic garbage collection based on heuristics.
+    enable_performance_metrics: bool, // Whether to enable performance related messages.
     empty_set: Ldd,
     empty_vector: Ldd,
 }
@@ -99,6 +100,7 @@ impl Storage
             free: vec![],
             count_until_collection: 10000,
             enable_garbage_collection: true,
+            enable_performance_metrics: false,
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
@@ -156,8 +158,6 @@ impl Storage
     /// Cleans up all LDDs that are unreachable from the root LDDs.
     pub fn garbage_collect(&mut self)
     {
-        println!("Collecting garbage...");
-
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
         let num_of_elements = self.shared.borrow().table.len();
         for i in 0..num_of_elements
@@ -187,13 +187,20 @@ impl Storage
             }
         }
 
-        println!("Collected {} elements", self.free.len());
+        if self.enable_performance_metrics {
+            println!("Collected {} elements", self.free.len());
+        }
     }
     
     /// Enables automatic garbage collection, which is enabled by default.
     pub fn enable_garbage_collection(&mut self, enabled: bool)
     {
         self.enable_garbage_collection = enabled;
+    }
+
+    pub fn enable_performance_metrics(&mut self, enabled: bool)
+    {
+        self.enable_performance_metrics = enabled;
     }
 
     /// The 'false' LDD.
@@ -282,8 +289,10 @@ impl Drop for Storage
 {
     fn drop(&mut self)
     {
-        println!("There were {} reference count changes.", self.shared.borrow().reference_count_changes());
-        println!("There were at most {} references to storage.", self.shared.borrow().max_references());
+        if self.enable_performance_metrics {
+            println!("There were {} reference count changes.", self.shared.borrow().reference_count_changes());
+            println!("There were at most {} references to storage.", self.shared.borrow().max_references());
+        }
     }
 }
 
