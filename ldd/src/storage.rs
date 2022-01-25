@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::hash::{Hash, Hasher, BuildHasherDefault};
+use std::hash::{Hash, Hasher};
 use rustc_hash::FxHasher;
 
 use crate::operations::height;
@@ -65,7 +65,7 @@ pub struct Data(pub u64, pub Ldd, pub Ldd);
 pub struct Storage
 {
     shared: Rc<RefCell<SharedStorage>>, // Every Ldd points to the underlying shared storage.
-    index: HashMap<Node, usize, BuildHasherDefault<FxHasher>>,
+    index: FxHashMap<Node, usize>,
     free: Vec<usize>, // A list of free nodes.
 
     count_until_collection: u64, // Count down until the next garbage collection.
