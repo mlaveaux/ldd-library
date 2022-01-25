@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::hash::{Hash, Hasher};
-use rustc_hash::FxHasher;
+use rustc_hash::FxHashMap;
 
 use crate::operations::height;
 
