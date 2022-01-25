@@ -9,7 +9,6 @@ edition = "2021"
 ldd = { path="../ldd" }
 rand = "0.8.4"
 criterion = { version = "0.3", features = ["html_reports"] }
-pprof = { version = "0.3", features = ["flamegraph"], optional = true }
 
 [[bench]]
 name = "operation_benchmarks"
