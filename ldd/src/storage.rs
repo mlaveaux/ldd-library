@@ -188,6 +188,8 @@ impl Storage
         }
 
         println!("Collected {} elements", self.free.len());
+    }
+    
     /// Enables automatic garbage collection, which is enabled by default.
     pub fn enable_garbage_collection(&mut self, enabled: bool)
     {
