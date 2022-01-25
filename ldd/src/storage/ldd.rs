@@ -3,24 +3,21 @@ use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::cmp;
 
-use crate::storage::Node;
-
-/// Every LDD instance points to its root node in the storage.
+/// Every LDD points to its root node in the storage table.
 pub struct Ldd
 {
-    index: usize,
-    storage: Rc<RefCell<SharedStorage>>,
+    index: usize, // Index in the node table.
+    root: usize, // Index in the root set.
+    storage: Rc<RefCell<ProtectionSet>>,
 }
 
 impl Ldd
 {
-    pub fn new(storage: &Rc<RefCell<SharedStorage>>, index: usize) -> Ldd
+    pub fn new(protect: &Rc<RefCell<ProtectionSet>>, index: usize) -> Ldd
     {
-        let result = Ldd { storage: Rc::clone(storage), index };
-        storage.borrow_mut().protect( &result, Rc::strong_count(storage));
-        debug_assert!(storage.borrow().table[index].is_valid(), "Node {index} should not have been garbage collected");
+        let root = protect.borrow_mut().protect(index);
+        let result = Ldd { storage: Rc::clone(protect), index, root };
         result
     }
 
@@ -43,7 +40,7 @@ impl Drop for Ldd
 {
     fn drop(&mut self)
     {
-        self.storage.borrow_mut().unprotect(self);
+        self.storage.borrow_mut().unprotect(self.root);
     }
 }
 
@@ -71,52 +68,82 @@ impl Hash for Ldd
     }
 }
 
-/// Every LDD has shared access to the node table to adapt the reference counter.
-pub struct SharedStorage
+/// The protection set keeps track of LDD nodes that should not be garbage
+/// collected, i.e., that are protected.
+pub struct ProtectionSet
 {    
-    pub table: Vec<Node>,
-    reference_count_changes: u64, // The number of times reference counters are changed.
-    max_references: usize, // The maximum number of references to the shared storage.
+    pub roots: Vec<usize>, // Every ldd has an index in this table that points to the node.
+    free: Option<usize>,
+    number_of_insertions: u64,
 }
 
-impl SharedStorage
+impl ProtectionSet
 {
     pub fn new() -> Self
     {
-        SharedStorage { 
-            table: vec![], 
-            reference_count_changes: 0, 
-            max_references: 0 }
-    }
-    /// Returns total number of reference count changes.
-    pub fn reference_count_changes(&self) -> u64 
-    {
-         self.reference_count_changes 
+        ProtectionSet { 
+            roots: vec![],
+            free: None,
+            number_of_insertions: 0,
+        }
     }
 
-    /// Returns maximum number of references to the shared storage (is equal to maximum number of active variables).
-    pub fn max_references(&self) -> usize 
+    /// Returns The number of insertions into the protection set.
+    pub fn number_of_insertions(&self) -> u64 
     {
-        self.max_references 
+        self.number_of_insertions 
+    }
+
+    /// Returns maximum number of active ldd instances.
+    pub fn maximum_size(&self) -> usize 
+    {
+        self.roots.capacity() 
     }
 
     /// Protect the given ldd to prevent garbage collection.
-    fn protect(&mut self, ldd: &Ldd, count: usize)
+    fn protect(&mut self, index: usize) -> usize
     {
-        self.reference_count_changes += 1;
-        self.max_references = cmp::max(self.max_references, count);
-        self.table[ldd.index].reference_count += 1;
+        self.number_of_insertions += 1;
+
+        match self.free {
+            None => {
+                // If free list is empty insert new entry into roots.
+                self.roots.push(index);
+                self.roots.len() - 1
+            }
+            Some(first) => {
+                let next = self.roots[first];
+                if first == next {
+                    // The list is empty as its first element points to itself.
+                    self.free = None;
+                } else {
+                    // Update free to be the next element in the list.
+                    self.free = Some(next);
+                }
+
+                self.roots[first] = index;
+                first
+            }
+        }
     }
     
     /// Remove protection from the given LDD.
-    fn unprotect(&mut self, ldd: &Ldd)
+    fn unprotect(&mut self, root: usize)
     {
-        self.reference_count_changes += 1;
-        self.table[ldd.index].reference_count -= 1;
+        match self.free {
+            None => {
+                self.roots[root] = root;
+            }
+            Some(next) => {
+                self.roots[root] = next;
+            }
+        };
+        
+        self.free = Some(root);
     }
 }
 
-impl Default for SharedStorage {
+impl Default for ProtectionSet {
     fn default() -> Self {
         Self::new()
     }
