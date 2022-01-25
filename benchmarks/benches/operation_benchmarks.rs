@@ -58,11 +58,12 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
 
 pub fn criterion_benchmark(c: &mut Criterion) 
 {        
-    let mut storage = Storage::new();
 
     c.bench_function("union 1000", 
     |bencher| 
         {
+            let mut storage = Storage::new();
+
             bencher.iter(
             || {
                 let set_a = random_vector_set(1000, 10, 10);
@@ -75,12 +76,12 @@ pub fn criterion_benchmark(c: &mut Criterion)
             })
         });
 
-    drop(storage);
-    let mut storage = Storage::new();
         
     c.bench_function("minus 1000", 
     |bencher| 
         {
+            let mut storage = Storage::new();
+            
             bencher.iter(
             || {
                 let set_a = random_vector_set(1000, 10, 10);
@@ -93,12 +94,12 @@ pub fn criterion_benchmark(c: &mut Criterion)
             })
         });
         
-    drop(storage);
-    let mut storage = Storage::new();
 
     c.bench_function("relational_product 1000", 
     |bencher| 
         {
+            let mut storage = Storage::new();
+
             bencher.iter(
             || {
                 let set = random_vector_set(1000, 10, 10);        
