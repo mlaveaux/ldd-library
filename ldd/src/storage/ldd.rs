@@ -72,7 +72,7 @@ impl Hash for Ldd
 /// collected, i.e., that are protected.
 pub struct ProtectionSet
 {    
-    pub roots: Vec<usize>, // Every ldd has an index in this table that points to the node.
+    pub roots: Vec<(usize, bool)>, // Every ldd has an index in this table that points to the node.
     free: Option<usize>,
     number_of_insertions: u64,
 }
@@ -108,20 +108,20 @@ impl ProtectionSet
         match self.free {
             None => {
                 // If free list is empty insert new entry into roots.
-                self.roots.push(index);
+                self.roots.push((index, true));
                 self.roots.len() - 1
             }
             Some(first) => {
                 let next = self.roots[first];
-                if first == next {
+                if first == next.0 {
                     // The list is empty as its first element points to itself.
                     self.free = None;
                 } else {
                     // Update free to be the next element in the list.
-                    self.free = Some(next);
+                    self.free = Some(next.0);
                 }
 
-                self.roots[first] = index;
+                self.roots[first] = (index, true);
                 first
             }
         }
@@ -132,10 +132,10 @@ impl ProtectionSet
     {
         match self.free {
             None => {
-                self.roots[root] = root;
+                self.roots[root] = (root, false);
             }
             Some(next) => {
-                self.roots[root] = next;
+                self.roots[root] = (next, false);
             }
         };
         

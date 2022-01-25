@@ -160,8 +160,11 @@ impl Storage
         let length =  self.shared.borrow().roots.len();
         for i in 0..length
         {
-            let root = self.shared.borrow().roots[i];
-            self.mark_node(root);
+            let (root, valid) = self.shared.borrow().roots[i];
+            if valid
+            {
+                self.mark_node(root);
+            }
         }
         
         // Collect all garbage.
