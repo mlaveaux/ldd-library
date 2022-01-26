@@ -62,7 +62,7 @@ pub struct Data(pub u64, pub Ldd, pub Ldd);
 /// table. This means that Ldds n and m are identical iff their indices match.
 pub struct Storage
 {
-    shared: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.
+    protection_set: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.
     table: Vec<Node>,
     index: FxHashMap<Node, usize>,
     free: Vec<usize>, // A list of free nodes.
@@ -88,13 +88,16 @@ impl Storage
 
         Self { 
             index: HashMap::default(),
-            shared: shared.clone(),
-            free: vec![],
+            protection_set: shared.clone(),
+            free: Vec::new(),
             table:  vec![
                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
                 Node::new(0, 0, 0),
                 Node::new(0, 0, 0),
                 ],
+            cache3: Cache3::default(),
+            cache2: Cache2::default(),
+
             count_until_collection: 10000,
             enable_garbage_collection: true,
             enable_performance_metrics: false,
@@ -128,7 +131,7 @@ impl Storage
         }
 
         let new_node = Node::new(value, down.index(), right.index());
-        Ldd::new(&self.shared,
+        Ldd::new(&self.protection_set,
             *self.index.entry(new_node).or_insert_with(
             || 
             {
@@ -157,14 +160,10 @@ impl Storage
     {
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
-        let length =  self.shared.borrow().roots.len();
-        for i in 0..length
+        let mut stack: Vec<usize> = Vec::new();
+        for root in self.protection_set.borrow().iter()
         {
-            let (root, valid) = self.shared.borrow().roots[i];
-            if valid
-            {
-                self.mark_node(root);
-            }
+            mark_node(&mut self.table, &mut stack, root);
         }
         
         // Collect all garbage.
@@ -226,7 +225,7 @@ impl Storage
     {
         self.verify_ldd(ldd);
         let node = &self.table[ldd.index()];
-        Ldd::new(&self.shared, node.down)
+        Ldd::new(&self.protection_set, node.down)
     }
 
     /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
@@ -234,7 +233,7 @@ impl Storage
     {
         self.verify_ldd(ldd);
         let node = &self.table[ldd.index()];
-        Ldd::new(&self.shared, node.right)
+        Ldd::new(&self.protection_set, node.right)
     }
 
     /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
@@ -247,7 +246,7 @@ impl Storage
             data = (node.value, node.down, node.right);
         }
 
-        Data(data.0, Ldd::new(&self.shared, data.1), Ldd::new(&self.shared, data.2))
+        Data(data.0, Ldd::new(&self.protection_set, data.1), Ldd::new(&self.protection_set, data.2))
     }
 
     // Asserts whether the given ldd is valid.
@@ -257,31 +256,6 @@ impl Storage
         debug_assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
         debug_assert!(self.table[ldd.index()].is_valid(), "Node {} should not have been garbage collected", ldd.index());
     }
-    
-    /// Mark all LDDs reachable from the given root index.
-    fn mark_node(&mut self, root: usize)
-    {
-        let mut stack: Vec<usize> = vec![root];
-        let table = &mut self.table;
-    
-        while let Some(current) = stack.pop()
-        {            
-            let node = &mut table[current];
-            if node.marked
-            {
-                continue
-            }
-            else
-            {
-                node.marked = true;
-                if current != 0 && current != 1 {
-                    stack.push(node.down);
-                    stack.push(node.right);
-                }
-            }
-        }
-    }    
-
 }
 
 impl Drop for Storage
@@ -289,12 +263,38 @@ impl Drop for Storage
     fn drop(&mut self)
     {
         if self.enable_performance_metrics {
-            println!("There were {} insertions into the protection set.", self.shared.borrow().number_of_insertions());
-            println!("There were at most {} root variables.", self.shared.borrow().maximum_size());
+            println!("There were {} insertions into the protection set.", self.protection_set.borrow().number_of_insertions());
+            println!("There were at most {} root variables.", self.protection_set.borrow().maximum_size());
             println!("There were at most {} nodes.", self.table.capacity());
         }
     }
 }
+
+/// Mark all LDDs reachable from the given root index.
+/// 
+/// Reuses the stack for the depth-first exploration.
+fn mark_node(table: &mut Vec<Node>, stack: &mut Vec<usize>, root: usize)
+{
+    stack.push(root);
+    while let Some(current) = stack.pop()
+    {            
+        let node = &mut table[current];
+        if node.marked
+        {
+            continue
+        }
+        else
+        {
+            node.marked = true;
+            if current != 0 && current != 1 {
+                stack.push(node.down);
+                stack.push(node.right);
+            }
+        }
+    }
+    
+    debug_assert!(stack.is_empty(), "When marking finishes the stack should be empty");
+} 
 
 #[cfg(test)]
 mod tests

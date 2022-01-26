@@ -9,15 +9,15 @@ pub struct Ldd
 {
     index: usize, // Index in the node table.
     root: usize, // Index in the root set.
-    storage: Rc<RefCell<ProtectionSet>>,
+    protection_set: Rc<RefCell<ProtectionSet>>,
 }
 
 impl Ldd
 {
-    pub fn new(protect: &Rc<RefCell<ProtectionSet>>, index: usize) -> Ldd
+    pub fn new(protection_set: &Rc<RefCell<ProtectionSet>>, index: usize) -> Ldd
     {
-        let root = protect.borrow_mut().protect(index);
-        let result = Ldd { storage: Rc::clone(protect), index, root };
+        let root = protection_set.borrow_mut().protect(index);
+        let result = Ldd { protection_set: Rc::clone(protection_set), index, root };
         result
     }
 
@@ -32,7 +32,7 @@ impl Clone for Ldd
 {
     fn clone(&self) -> Self
     {
-        Ldd::new(&self.storage, self.index)
+        Ldd::new(&self.protection_set, self.index)
     }
 }
 
@@ -40,7 +40,7 @@ impl Drop for Ldd
 {
     fn drop(&mut self)
     {
-        self.storage.borrow_mut().unprotect(self.root);
+        self.protection_set.borrow_mut().unprotect(self.root);
     }
 }
 
@@ -48,7 +48,7 @@ impl PartialEq for Ldd
 {
     fn eq(&self, other: &Self) -> bool
     {
-        debug_assert!(Rc::ptr_eq(&self.storage, &other.storage), "Both LDDs should refer to the same storage."); 
+        debug_assert!(Rc::ptr_eq(&self.protection_set, &other.protection_set), "Both LDDs should refer to the same storage."); 
         self.index == other.index
     }
 }
@@ -67,6 +67,8 @@ impl Hash for Ldd
         self.index().hash(state);
     }
 }
+
+impl Eq for Ldd {}
 
 /// The protection set keeps track of LDD nodes that should not be garbage
 /// collected, i.e., that are protected.
@@ -100,7 +102,16 @@ impl ProtectionSet
         self.roots.capacity() 
     }
 
-    /// Protect the given ldd to prevent garbage collection.
+    /// Returns an iterator over all root indices in the protection set.
+    pub fn iter(&self) -> ProtSetIter
+    {
+        ProtSetIter {
+            current: 0,
+            set: self,
+        }
+    }
+
+    /// Protect the given node to prevent garbage collection.
     fn protect(&mut self, index: usize) -> usize
     {
         self.number_of_insertions += 1;
@@ -127,7 +138,7 @@ impl ProtectionSet
         }
     }
     
-    /// Remove protection from the given LDD.
+    /// Remove protection from the given LDD, note that root is here the index returned by [protect].
     fn unprotect(&mut self, root: usize)
     {
         match self.free {
@@ -149,4 +160,30 @@ impl Default for ProtectionSet {
     }
 }    
 
-impl Eq for Ldd {}
+pub struct ProtSetIter<'a>
+{
+    current: usize,
+    set: &'a ProtectionSet,
+}
+
+impl Iterator for ProtSetIter<'_>
+{
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item>
+    {
+        // Find the next valid entry, return it when found or None when end of roots is reached.
+        while self.current < self.set.roots.len()
+        {
+            let (root, valid) = self.set.roots[self.current];
+            if valid {
+                return Some(root);
+            } else {
+                self.current += 1
+            }
+        }
+        
+        None
+    }
+}
+
