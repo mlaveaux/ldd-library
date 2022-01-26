@@ -74,7 +74,7 @@ impl Eq for Ldd {}
 /// collected, i.e., that are protected.
 pub struct ProtectionSet
 {    
-    pub roots: Vec<(usize, bool)>, // Every ldd has an index in this table that points to the node.
+    roots: Vec<(usize, bool)>, // Every ldd has an index in this table that points to the node.
     free: Option<usize>,
     number_of_insertions: u64,
 }
@@ -84,7 +84,7 @@ impl ProtectionSet
     pub fn new() -> Self
     {
         ProtectionSet { 
-            roots: vec![],
+            roots: Vec::new(),
             free: None,
             number_of_insertions: 0,
         }
@@ -107,7 +107,7 @@ impl ProtectionSet
     {
         ProtSetIter {
             current: 0,
-            set: self,
+            protection_set: self,
         }
     }
 
@@ -163,7 +163,7 @@ impl Default for ProtectionSet {
 pub struct ProtSetIter<'a>
 {
     current: usize,
-    set: &'a ProtectionSet,
+    protection_set: &'a ProtectionSet,
 }
 
 impl Iterator for ProtSetIter<'_>
@@ -173,13 +173,12 @@ impl Iterator for ProtSetIter<'_>
     fn next(&mut self) -> Option<Self::Item>
     {
         // Find the next valid entry, return it when found or None when end of roots is reached.
-        while self.current < self.set.roots.len()
+        while self.current < self.protection_set.roots.len()
         {
-            let (root, valid) = self.set.roots[self.current];
+            let (root, valid) = self.protection_set.roots[self.current];
+            self.current += 1;
             if valid {
                 return Some(root);
-            } else {
-                self.current += 1
             }
         }
         
@@ -187,3 +186,42 @@ impl Iterator for ProtSetIter<'_>
     }
 }
 
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+    use crate::test_utility::*;
+
+    #[test]
+    fn test_protection_set()
+    {
+        let mut protection_set = ProtectionSet::new();
+
+        // Protect a number of LDDs and record their indices.
+        let root_variables = random_vector(1000, 5000);
+        let mut indices: Vec<usize> = Vec::new();
+
+        for variable in root_variables
+        {
+            indices.push(protection_set.protect(variable as usize));
+        }
+
+        // Unprotect a number of LDDs.
+        for index in 0..250
+        {
+            protection_set.unprotect(indices[index]);
+            indices.remove(index);
+        }
+        
+        for index in indices
+        {
+            let (_, valid) = protection_set.roots[index];
+            assert!(valid, "All indices that are not unprotected should occur in the protection set");
+        }
+
+        for root in protection_set.iter()
+        {
+            assert!(root <= 5000, "Root must be valid");
+        }
+    }
+}
