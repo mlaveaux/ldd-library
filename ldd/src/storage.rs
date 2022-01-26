@@ -95,8 +95,6 @@ impl Storage
                 Node::new(0, 0, 0),
                 Node::new(0, 0, 0),
                 ],
-            cache3: Cache3::default(),
-            cache2: Cache2::default(),
 
             count_until_collection: 10000,
             enable_garbage_collection: true,
