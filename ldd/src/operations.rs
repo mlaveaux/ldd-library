@@ -141,17 +141,19 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
     singleton(storage, &meta)
 }
 
-/// Computes the set of vectors reachable in one step from the given 'set' as defined by the sparse relation rel, where meta = compute_meta(read_proj, write_proj).
+/// Computes the set of vectors reachable in one step from the given set as defined by the sparse relation rel. Requires that meta = compute_meta(read_proj, write_proj).
 /// 
-/// relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
-///     where R is the relation and S the set.
+/// # Details
+/// 
+/// Formal definition of the function. relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
+/// where R is the relation and S the set.
 ///  
-/// meta is a singleton vector where the value indicates the following for that index:
-///     - 0 = not part the relation.
-///     - 1 = only in read_proj
-///     - 2 = only in write_proj
-///     - 3 = in both read_proj and write_proj (read phase)
-///     - 4 = in both read_proj and write_proj (write phase)
+/// meta is a singleton vector where the value indicates the following:
+///   - 0 = not part the relation.
+///   - 1 = only in read_proj.
+///   - 2 = only in write_proj.
+///   - 3 = in both read_proj and write_proj (read phase).
+///   - 4 = in both read_proj and write_proj (write phase).
 pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
 {
     debug_assert_ne!(meta, storage.empty_set(), "proj must be a singleton");
@@ -285,7 +287,7 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
     minus_impl(storage, a.clone(), b.clone())
 }
 
-/// Returns the union of the given LDDs.
+/// Returns the union of the given LDDs, i.e., a ∪ b.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
     union_impl(storage, a.clone(), b.clone())

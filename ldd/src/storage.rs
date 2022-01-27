@@ -57,12 +57,13 @@ impl Hash for Node
     }
 }
 
-/// This is the user-facing data of a Node.
+/// This is the user facing data of a [Node].
 pub struct Data(pub u64, pub Ldd, pub Ldd);
 
 /// The storage that implements the maximal sharing behaviour. Meaning that
 /// identical nodes (same value, down and right) have a unique index in the node
-/// table. This means that Ldds n and m are identical iff their indices match.
+/// table. Therefore guaranteeing that Ldds n and m are identical iff their
+/// indices in the node table match.
 pub struct Storage
 {
     protection_set: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.

@@ -6,6 +6,14 @@ use crate::{Storage, Ldd};
 
 use super::ldd::ProtectionSet;
 
+/// The operation cache can significantly speed up operations by caching
+/// intermediate results. This is necessary since the maximal sharing means that
+/// the same inputs can be encountered many times while evaluating the
+/// operations.
+/// 
+/// For all operations defined in `operations.rs` where caching helps we
+/// introduce a cache. The cache that belongs to one operation is identified by
+/// the value of [UnaryFunction], [BinaryOperator] or [TernaryOperator].
 pub struct OperationCache
 {
     protection_set: Rc<RefCell<ProtectionSet>>,
@@ -14,17 +22,20 @@ pub struct OperationCache
     caches3: Vec<FxHashMap<(usize, usize, usize), usize>>,
 }
 
+/// Any function from LDD -> usize.
 pub enum UnaryFunction
 {
     Len,
 }
 
+/// Any operator from LDD x LDD -> LDD.
 pub enum BinaryOperator
 {
     Union,
     Minus,
 }
 
+/// Any operator from LDD x LDD x LDD -> LDD.
 pub enum TernaryOperator
 {
     RelationalProduct,
@@ -42,6 +53,9 @@ impl OperationCache
         }
     }
 
+    /// Clear all existing caches. This must be done during garbage collection
+    /// since caches have references to elements in the node table that are not
+    /// protected.
     pub fn clear(&mut self)
     {    
         for cache in self.caches1.iter_mut() {
@@ -79,6 +93,7 @@ impl OperationCache
         }
     }
 
+    /// Create an Ldd from the given index. Only safe because this is a private function.
     fn create(&mut self, index: usize) -> Ldd
     {
         Ldd::new(&self.protection_set, index)

@@ -14,10 +14,9 @@
 //!
 //! Next, we should explain how LDDs represent a set of vectors. Given an LDD n
 //! then \[n\] is inductively defined as:
-//!   - \[false\] = empty set
-//!   - \[true\] = { <> }
-//!   - \[node(value, down, right)\] = { value x | x in \[down\] } union
-//!     \[right\]
+//!   - \[false\]                    = ∅
+//!   - \[true\]                     = { <> }
+//!   - \[node(value, down, right)\] = { value x | x in \[down\] } ∪ \[right\]
 //!
 //! Node that since 'true' and 'false' are not very insightful and clash with
 //! Rust keywords we use 'empty vector' and 'empty set' for the constants 'true'
@@ -27,8 +26,8 @@
 //! # Citations
 //!
 //! \[Dijk18\] --- Tom van Dijk, Jaco van de Pol. Sylvan: multi-core framework
-//! for decision diagrams. Int. J. Softw. Tools Technol. Transf. 19(6):675-696,
-//! 2017.
+//! for decision diagrams. International Journal on Software Tools for
+//! Technology Transfer. 19(6):675-696, 2017.
 
 mod storage;
 mod operations;

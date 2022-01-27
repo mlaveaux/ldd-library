@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Every LDD points to its root node in the storage table.
+/// Every LDD points to its root node in the [Storage] instance for maximum sharing.
 pub struct Ldd
 {
     index: usize, // Index in the node table.
