@@ -3,6 +3,48 @@ use std::io::Read;
 use std::collections::HashMap;
 use std::error::Error;
 
+pub struct Transition
+{
+    pub relation: ldd::Ldd,
+    pub meta: ldd::Ldd,
+}
+
+/// Returns the (initial state, transitions) read from the file in Sylvan's format.
+pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ldd, Vec<Transition>), Box<dyn Error>>
+{    
+    let mut file = File::open(filename)?;
+    let mut reader = SylvanReader::new();
+
+    let _vector_length = read_u32(&mut file)?;
+    //println!("Length of vector {}", vector_length);
+
+    let _unused = read_u32(&mut file)?; // This is called 'k' in Sylvan's ldd2bdd.c, but unused.
+    let initial_state = reader.read_ldd(storage, &mut file)?;
+
+    let num_transitions: usize = read_u32(&mut file)? as usize;
+    let mut transitions: Vec<Transition> = Vec::new();
+
+    // Read all the transition groups.
+    for _ in 0..num_transitions
+    {
+        let (read_proj, write_proj) = read_projection(&mut file)?;
+        transitions.push(
+            Transition {
+                relation: storage.empty_set().clone(),
+                meta: ldd::compute_meta(storage, &read_proj, &write_proj),
+            }
+        );
+    }
+
+    for transition in transitions.iter_mut().take(num_transitions)
+    {
+        transition.relation = reader.read_ldd(storage, &mut file)?;
+    }
+
+    // Ignore the rest for now.
+    Ok((initial_state, transitions))
+}
+
 struct SylvanReader
 {
   indexed_set: HashMap::<u64,ldd::Ldd>, // Assigns LDDs to every index.
@@ -11,7 +53,7 @@ struct SylvanReader
 
 impl SylvanReader
 {  
-  pub fn new() -> Self
+  fn new() -> Self
   {
     Self {
       indexed_set: HashMap::new(),
@@ -20,7 +62,7 @@ impl SylvanReader
   }
   
   /// Returns an LDD read from the given file in the Sylvan format.
-  pub fn read_ldd(&mut self, storage: &mut ldd::Storage, file: &mut File) -> Result<ldd::Ldd, Box<dyn Error>>
+  fn read_ldd(&mut self, storage: &mut ldd::Storage, file: &mut File) -> Result<ldd::Ldd, Box<dyn Error>>
   {
       let count = read_u64(file)?;
       //println!("node count = {}", count);  
@@ -58,7 +100,7 @@ impl SylvanReader
       }
 
       let result = read_u64(file)?;
-      Ok(self.indexed_set.get(&result).unwrap().clone())
+      Ok(self.node_from_index(storage, result))
   }
 
   /// Returns the LDD belonging to the given index.
@@ -122,46 +164,22 @@ fn read_projection(file: &mut File) -> Result<(Vec<u64>,  Vec<u64>), Box<dyn Err
     Ok((read_proj, write_proj))
 }
 
-pub struct Transition
+#[cfg(test)]
+mod test
 {
-    pub relation: ldd::Ldd,
-    pub meta: ldd::Ldd,
-}
+    use super::*;
 
-/// Returns the (initial state, transitions) read from the file in Sylvan's format.
-pub fn load_model(storage: &mut ldd::Storage, filename: &str) -> Result<(ldd::Ldd, Vec<Transition>), Box<dyn Error>>
-{    
-    let mut file = File::open(filename)?;
-    let mut reader = SylvanReader::new();
-
-    let _vector_length = read_u32(&mut file)?;
-    //println!("Length of vector {}", vector_length);
-
-    let _unused = read_u32(&mut file)?; // This is called 'k' in Sylvan's ldd2bdd.c, but unused.
-    let initial_state = reader.read_ldd(storage, &mut file)?;
-
-    let num_transitions: usize = read_u32(&mut file)? as usize;
-    let mut transitions: Vec<Transition> = Vec::new();
-
-    // Read all the transition groups.
-    for _ in 0..num_transitions
+    #[test]
+    fn test_load_anderson_4()
     {
-        let (read_proj, write_proj) = read_projection(&mut file)?;
-        transitions.push(
-            Transition {
-                relation: storage.empty_set().clone(),
-                meta: ldd::compute_meta(storage, &read_proj, &write_proj),
-            }
-        );
+        let mut storage = ldd::Storage::new();
+        let (_, _) = load_model(&mut storage, "models/anderson.4.ldd").expect("Loading should work correctly");
     }
 
-    for transition in transitions.iter_mut().take(num_transitions)
+    #[test]
+    fn test_load_collision_4()
     {
-        transition.relation = reader.read_ldd(storage, &mut file)?;
+        let mut storage = ldd::Storage::new();
+        let (_, _) = load_model(&mut storage, "models/collision.4.ldd").expect("Loading should work correctly");
     }
-
-    // Ignore the rest for now.
-
-    Ok((initial_state, transitions))
 }
-
