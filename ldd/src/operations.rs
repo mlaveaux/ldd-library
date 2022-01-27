@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op};
+use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op, BinaryOperator, TernaryOperator, cache_unary_function, UnaryFunction};
 
 use std::cmp::{self, Ordering};
 
@@ -162,7 +162,7 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
     } else if set == storage.empty_set() || rel == storage.empty_set() {
         storage.empty_set().clone()
     } else {
-        cache_terniary_op(storage, 0, set, rel, meta, 
+        cache_terniary_op(storage, TernaryOperator::RelationalProduct, set, rel, meta, 
         |storage, set, rel, meta| 
         {            
             let Data(meta_value, meta_down, _) = storage.get(meta);
@@ -313,20 +313,31 @@ pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
 }
 
 /// Returns the number of elements in the set.
-pub fn len(storage: &Storage, set: &Ldd) -> usize
+pub fn len(storage: &mut Storage, set: &Ldd) -> usize
 {
     if set == storage.empty_set() {
         0
     } else if set == storage.empty_vector() {
         1
     } else {
-        let mut result: usize = 0;
-        for Data(_, down, _) in iter_right(storage, set)
-        {
-            result += len(storage, &down);
-        }
+        cache_unary_function(storage, UnaryFunction::Len, set, 
+         |storage, a| 
+            {
+                let mut result: usize = 0;
 
-        result
+                let mut current = a.clone();
+                while current != *storage.empty_set()
+                {
+                    // Progress to the right LDD.
+                    let Data(_, down, right) = storage.get(&current);                        
+                    result += len(storage, &down);
+                    current = right.clone();   
+                }
+
+                result
+            }
+        )
+
     }
 }
 
@@ -353,7 +364,7 @@ fn union_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == *storage.empty_set() {
         a
     } else {
-        cache_comm_binary_op(storage, 0, a, b, 
+        cache_comm_binary_op(storage, BinaryOperator::Union, a, b, 
             |storage, a, b|
             {
                 let Data(a_value, a_down, a_right) = storage.get(&a);
@@ -386,7 +397,7 @@ fn minus_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == *storage.empty_set() {
         a
     } else {
-        cache_binary_op(storage, 1, a, b, 
+        cache_binary_op(storage, BinaryOperator::Minus, a, b, 
             |storage, a, b|
             {
                 let Data(a_value, a_down, a_right) = storage.get(&a);
@@ -510,7 +521,7 @@ mod tests
         let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
 
-        assert_eq!(set.len(), len(&storage, &ldd), "Length did not match expected set");
+        assert_eq!(set.len(), len(&mut storage, &ldd), "Length did not match expected set");
     }
 
     // Test the minus function with random inputs.

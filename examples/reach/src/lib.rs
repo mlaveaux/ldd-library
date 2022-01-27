@@ -33,7 +33,7 @@ pub fn run(config: &Config) -> Result<usize, Box<dyn Error>>
         iteration += 1;
     }
 
-    let num_of_states = ldd::len(&storage, &states);
+    let num_of_states = ldd::len(&mut storage, &states);
     println!("The model has {} states", num_of_states);
 
     Ok(num_of_states)
