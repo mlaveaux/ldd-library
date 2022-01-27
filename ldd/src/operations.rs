@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data, iterators::*};
+use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op};
 
 use std::cmp::{self, Ordering};
 
@@ -162,118 +162,120 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
     } else if set == storage.empty_set() || rel == storage.empty_set() {
         storage.empty_set().clone()
     } else {
-        let Data(meta_value, meta_down, _) = storage.get(meta);
+        cache_terniary_op(storage, 0, set, rel, meta, 
+        |storage, set, rel, meta| 
+        {            
+            let Data(meta_value, meta_down, _) = storage.get(meta);
 
-        let result = match meta_value
-        {
-            0 => {
-                // Consider all values on this level part of the output and continue with rest.
-                let Data(value, down, right) = storage.get(set);
+            match meta_value
+            {
+                0 => {
+                    // Consider all values on this level part of the output and continue with rest.
+                    let Data(value, down, right) = storage.get(set);
 
-                let right_result = relational_product(storage, &right, rel, meta);
-                let down_result = relational_product(storage, &down, rel, &meta_down);
-                if down_result == *storage.empty_set()
-                {
-                    right_result
-                } 
-                else 
-                {
-                    storage.insert(value, &down_result, &right_result)
-                }
-            }
-            1 => {
-                // Read the values present in the relation and continue with these values in the set.
-                let Data(set_value, set_down, set_right) = storage.get(set);
-                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
-                
-                match set_value.cmp(&rel_value) {
-                    Ordering::Less => {
-                        relational_product(storage, &set_right, rel, meta)                        
-                    }                    
-                    Ordering::Equal => {
-                        let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
-                        let right_result = relational_product(storage, &set_right, &rel_right, meta);
-                        if down_result == *storage.empty_set()
-                        {
-                            right_result
-                        } 
-                        else 
-                        {
-                            storage.insert(set_value, &down_result, &right_result)
-                        }  
-                    }
-                    Ordering::Greater => {
-                        relational_product(storage, set, &rel_right, meta)
+                    let right_result = relational_product(storage, &right, rel, meta);
+                    let down_result = relational_product(storage, &down, rel, &meta_down);
+                    if down_result == *storage.empty_set()
+                    {
+                        right_result
+                    } 
+                    else 
+                    {
+                        storage.insert(value, &down_result, &right_result)
                     }
                 }
-            }
-            2 => {
-                // All values in set should be considered.
-                let mut combined = storage.empty_set().clone(); 
-                let mut current = set.clone();            
-                loop {
-                    let Data(_, set_down, set_right) = storage.get(&current);
-                    combined = union(storage, &combined, &set_down);
-
-                    if set_right == *storage.empty_set() {
-                        break;
-                    }
-                    current = set_right;
-                } 
-                
-                // Write the values present in the relation.
-                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
-
-                let down_result = relational_product(storage, &combined, &rel_down, &meta_down);
-                let right_result = relational_product(storage, set, &rel_right, meta);
-                if down_result == *storage.empty_set()
-                {
-                    right_result
-                } 
-                else 
-                {
-                    storage.insert(rel_value, &down_result, &right_result)
-                }
-            }
-            3 => {
-                let Data(set_value, set_down, set_right) = storage.get(set);
-                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
-                
-                match set_value.cmp(&rel_value) {
-                    Ordering::Less => {
-                        relational_product(storage, &set_right, rel, meta)                        
-                    }                    
-                    Ordering::Equal => {
-                        let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
-                        let right_result = relational_product(storage, &set_right, &rel_right, meta);
-                        union(storage, &down_result, &right_result)
-                    }
-                    Ordering::Greater => {
-                        relational_product(storage, set, &rel_right, meta)
+                1 => {
+                    // Read the values present in the relation and continue with these values in the set.
+                    let Data(set_value, set_down, set_right) = storage.get(set);
+                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    
+                    match set_value.cmp(&rel_value) {
+                        Ordering::Less => {
+                            relational_product(storage, &set_right, rel, meta)                        
+                        }                    
+                        Ordering::Equal => {
+                            let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
+                            let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                            if down_result == *storage.empty_set()
+                            {
+                                right_result
+                            } 
+                            else 
+                            {
+                                storage.insert(set_value, &down_result, &right_result)
+                            }  
+                        }
+                        Ordering::Greater => {
+                            relational_product(storage, set, &rel_right, meta)
+                        }
                     }
                 }
-            }
-            4 => {                
-                // Write the values present in the relation.
-                let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                2 => {
+                    // All values in set should be considered.
+                    let mut combined = storage.empty_set().clone(); 
+                    let mut current = set.clone();            
+                    loop {
+                        let Data(_, set_down, set_right) = storage.get(&current);
+                        combined = union(storage, &combined, &set_down);
 
-                let down_result = relational_product(storage, set, &rel_down, &meta_down);
-                let right_result = relational_product(storage, set, &rel_right, meta);
-                if down_result == *storage.empty_set()
-                {
-                    right_result
-                } 
-                else 
-                {
-                    storage.insert(rel_value, &down_result, &right_result)
+                        if set_right == *storage.empty_set() {
+                            break;
+                        }
+                        current = set_right;
+                    } 
+                    
+                    // Write the values present in the relation.
+                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+
+                    let down_result = relational_product(storage, &combined, &rel_down, &meta_down);
+                    let right_result = relational_product(storage, set, &rel_right, meta);
+                    if down_result == *storage.empty_set()
+                    {
+                        right_result
+                    } 
+                    else 
+                    {
+                        storage.insert(rel_value, &down_result, &right_result)
+                    }
+                }
+                3 => {
+                    let Data(set_value, set_down, set_right) = storage.get(set);
+                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    
+                    match set_value.cmp(&rel_value) {
+                        Ordering::Less => {
+                            relational_product(storage, &set_right, rel, meta)                        
+                        }                    
+                        Ordering::Equal => {
+                            let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
+                            let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                            union(storage, &down_result, &right_result)
+                        }
+                        Ordering::Greater => {
+                            relational_product(storage, set, &rel_right, meta)
+                        }
+                    }
+                }
+                4 => {                
+                    // Write the values present in the relation.
+                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+
+                    let down_result = relational_product(storage, set, &rel_down, &meta_down);
+                    let right_result = relational_product(storage, set, &rel_right, meta);
+                    if down_result == *storage.empty_set()
+                    {
+                        right_result
+                    } 
+                    else 
+                    {
+                        storage.insert(rel_value, &down_result, &right_result)
+                    }
+                }
+                x => {
+                    panic!("meta has unexpected value: {}", x);
                 }
             }
-            x => {
-                panic!("meta has unexpected value: {}", x);
-            }
-        };
-
-        result
+        })
     }
 }
 
@@ -351,24 +353,29 @@ fn union_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == *storage.empty_set() {
         a
     } else {
-        let Data(a_value, a_down, a_right) = storage.get(&a);
-        let Data(b_value, b_down, b_right) = storage.get(&b);
-
-        match a_value.cmp(&b_value) {
-            Ordering::Less => {
-                let result = union_impl(storage, a_right, b);
-                storage.insert(a_value, &a_down, &result)
-            },
-            Ordering::Equal => {
-                let down_result = union_impl(storage, a_down, b_down);
-                let right_result = union_impl(storage, a_right, b_right);
-                storage.insert(a_value, &down_result, &right_result)
-            },
-            Ordering::Greater => {
-                let result = union_impl(storage, a, b_right);
-                storage.insert(b_value, &b_down, &result)
+        cache_comm_binary_op(storage, 0, a, b, 
+            |storage, a, b|
+            {
+                let Data(a_value, a_down, a_right) = storage.get(&a);
+                let Data(b_value, b_down, b_right) = storage.get(&b);
+        
+                match a_value.cmp(&b_value) {
+                    Ordering::Less => {
+                        let result = union_impl(storage, a_right, b);
+                        storage.insert(a_value, &a_down, &result)
+                    },
+                    Ordering::Equal => {
+                        let down_result = union_impl(storage, a_down, b_down);
+                        let right_result = union_impl(storage, a_right, b_right);
+                        storage.insert(a_value, &down_result, &right_result)
+                    },
+                    Ordering::Greater => {
+                        let result = union_impl(storage, a, b_right);
+                        storage.insert(b_value, &b_down, &result)
+                    }
+                }
             }
-        }
+        )        
     }
 }
 
@@ -379,30 +386,35 @@ fn minus_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
     } else if b == *storage.empty_set() {
         a
     } else {
-        let Data(a_value, a_down, a_right) = storage.get(&a);
-        let Data(b_value, b_down, b_right) = storage.get(&b);
-
-        match a_value.cmp(&b_value) {
-            Ordering::Less => {
-                let right_result = minus_impl(storage, a_right, b);
-                storage.insert(a_value, &a_down, &right_result)
-            },
-            Ordering::Equal => {
-                let down_result = minus_impl(storage, a_down, b_down);
-                let right_result = minus_impl(storage, a_right, b_right);
-                if down_result == *storage.empty_set()
-                {
-                    right_result
-                } 
-                else 
-                {
-                    storage.insert(a_value, &down_result, &right_result)
-                }                
-            },
-            Ordering::Greater => {
-                minus_impl(storage, a, b_right)
+        cache_binary_op(storage, 1, a, b, 
+            |storage, a, b|
+            {
+                let Data(a_value, a_down, a_right) = storage.get(&a);
+                let Data(b_value, b_down, b_right) = storage.get(&b);
+        
+                match a_value.cmp(&b_value) {
+                    Ordering::Less => {
+                        let right_result = minus_impl(storage, a_right, b);
+                        storage.insert(a_value, &a_down, &right_result)
+                    },
+                    Ordering::Equal => {
+                        let down_result = minus_impl(storage, a_down, b_down);
+                        let right_result = minus_impl(storage, a_right, b_right);
+                        if down_result == *storage.empty_set()
+                        {
+                            right_result
+                        } 
+                        else 
+                        {
+                            storage.insert(a_value, &down_result, &right_result)
+                        }                
+                    },
+                    Ordering::Greater => {
+                        minus_impl(storage, a, b_right)
+                    }
+                }
             }
-        }
+        )
     }
 }
 

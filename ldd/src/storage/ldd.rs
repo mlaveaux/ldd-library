@@ -17,8 +17,7 @@ impl Ldd
     pub fn new(protection_set: &Rc<RefCell<ProtectionSet>>, index: usize) -> Ldd
     {
         let root = protection_set.borrow_mut().protect(index);
-        let result = Ldd { protection_set: Rc::clone(protection_set), index, root };
-        result
+        Ldd { protection_set: Rc::clone(protection_set), index, root }
     }
 
     pub fn index(&self) -> usize
@@ -72,6 +71,7 @@ impl Eq for Ldd {}
 
 /// The protection set keeps track of LDD nodes that should not be garbage
 /// collected, i.e., that are protected.
+#[derive(Default)]
 pub struct ProtectionSet
 {    
     roots: Vec<(usize, bool)>, // Every ldd has an index in this table that points to the node.
@@ -153,12 +153,6 @@ impl ProtectionSet
         self.free = Some(root);
     }
 }
-
-impl Default for ProtectionSet {
-    fn default() -> Self {
-        Self::new()
-    }
-}    
 
 pub struct ProtSetIter<'a>
 {

@@ -6,10 +6,13 @@ use rustc_hash::FxHashMap;
 
 use crate::operations::height;
 
-pub use self::ldd::Ldd;
-use self::ldd::ProtectionSet;
 
 mod ldd;
+mod cache;
+
+pub use self::cache::*;
+pub use self::ldd::Ldd;
+use self::ldd::ProtectionSet;
 
 /// This is the LDD node(value, down, right) with some additional meta data.
 pub struct Node
@@ -66,6 +69,7 @@ pub struct Storage
     table: Vec<Node>,
     index: FxHashMap<Node, usize>,
     free: Vec<usize>, // A list of free nodes.
+    cache: OperationCache,
 
     count_until_collection: u64, // Count down until the next garbage collection.
     enable_garbage_collection: bool, // Whether to enable automatic garbage collection based on heuristics.
@@ -95,6 +99,7 @@ impl Storage
                 Node::new(0, 0, 0),
                 Node::new(0, 0, 0),
                 ],
+            cache: OperationCache::new(Rc::clone(&shared)),
 
             count_until_collection: 10000,
             enable_garbage_collection: true,
@@ -102,6 +107,12 @@ impl Storage
             empty_set: Ldd::new(&shared, 0),
             empty_vector: Ldd::new(&shared, 1),
         }
+    }
+
+    /// Provides access to the underlying operation cache.
+    pub fn operation_cache(&mut self) -> &mut OperationCache
+    {
+        &mut self.cache
     }
 
     /// Create a new LDD node(value, down, right)
@@ -156,6 +167,7 @@ impl Storage
     /// Cleans up all LDDs that are unreachable from the root LDDs.
     pub fn garbage_collect(&mut self)
     {
+        self.cache.clear();
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
         let mut stack: Vec<usize> = Vec::new();
