@@ -284,13 +284,77 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
 pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    minus_impl(storage, a.clone(), b.clone())
+    if a == b || a == storage.empty_set() {
+        storage.empty_set().clone()
+    } else if b == storage.empty_set() {
+        a.clone()
+    } else {
+        cache_binary_op(storage, BinaryOperator::Minus, a, b, 
+            |storage, a, b|
+            {
+                let Data(a_value, a_down, a_right) = storage.get(&a);
+                let Data(b_value, b_down, b_right) = storage.get(&b);
+        
+                match a_value.cmp(&b_value) {
+                    Ordering::Less => {
+                        let right_result = minus(storage, &a_right, b);
+                        storage.insert(a_value, &a_down, &right_result)
+                    },
+                    Ordering::Equal => {
+                        let down_result = minus(storage, &a_down, &b_down);
+                        let right_result = minus(storage, &a_right, &b_right);
+                        if down_result == *storage.empty_set()
+                        {
+                            right_result
+                        } 
+                        else 
+                        {
+                            storage.insert(a_value, &down_result, &right_result)
+                        }                
+                    },
+                    Ordering::Greater => {
+                        minus(storage, a, &b_right)
+                    }
+                }
+            }
+        )
+    }
 }
 
 /// Returns the union of the given LDDs, i.e., a ∪ b.
 pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 {
-    union_impl(storage, a.clone(), b.clone())
+    if a == b {
+        a.clone()
+    } else if a == storage.empty_set() {
+        b.clone()
+    } else if b == storage.empty_set() {
+        a.clone()
+    } else {
+        cache_comm_binary_op(storage, BinaryOperator::Union, a, b, 
+            |storage, a, b|
+            {
+                let Data(a_value, a_down, a_right) = storage.get(&a);
+                let Data(b_value, b_down, b_right) = storage.get(&b);
+        
+                match a_value.cmp(&b_value) {
+                    Ordering::Less => {
+                        let result = union(storage, &a_right, b);
+                        storage.insert(a_value, &a_down, &result)
+                    },
+                    Ordering::Equal => {
+                        let down_result = union(storage, &a_down, &b_down);
+                        let right_result = union(storage, &a_right, &b_right);
+                        storage.insert(a_value, &down_result, &right_result)
+                    },
+                    Ordering::Greater => {
+                        let result = union(storage, a, &b_right);
+                        storage.insert(b_value, &b_down, &result)
+                    }
+                }
+            }
+        )        
+    }
 }
 
 /// Returns true iff the set contains the vector.
@@ -354,80 +418,6 @@ pub fn height(storage: &Storage, ldd: &Ldd) -> u64
         let Data(_, down, _) = storage.get(ldd);
 
         height(storage, &down) + 1        
-    }
-}
-
-fn union_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
-{
-    if a == b {
-        a
-    } else if a == *storage.empty_set() {
-        b
-    } else if b == *storage.empty_set() {
-        a
-    } else {
-        cache_comm_binary_op(storage, BinaryOperator::Union, a, b, 
-            |storage, a, b|
-            {
-                let Data(a_value, a_down, a_right) = storage.get(&a);
-                let Data(b_value, b_down, b_right) = storage.get(&b);
-        
-                match a_value.cmp(&b_value) {
-                    Ordering::Less => {
-                        let result = union_impl(storage, a_right, b);
-                        storage.insert(a_value, &a_down, &result)
-                    },
-                    Ordering::Equal => {
-                        let down_result = union_impl(storage, a_down, b_down);
-                        let right_result = union_impl(storage, a_right, b_right);
-                        storage.insert(a_value, &down_result, &right_result)
-                    },
-                    Ordering::Greater => {
-                        let result = union_impl(storage, a, b_right);
-                        storage.insert(b_value, &b_down, &result)
-                    }
-                }
-            }
-        )        
-    }
-}
-
-fn minus_impl(storage: &mut Storage, a: Ldd, b: Ldd) -> Ldd
-{
-    if a == b || a == *storage.empty_set() {
-        storage.empty_set().clone()
-    } else if b == *storage.empty_set() {
-        a
-    } else {
-        cache_binary_op(storage, BinaryOperator::Minus, a, b, 
-            |storage, a, b|
-            {
-                let Data(a_value, a_down, a_right) = storage.get(&a);
-                let Data(b_value, b_down, b_right) = storage.get(&b);
-        
-                match a_value.cmp(&b_value) {
-                    Ordering::Less => {
-                        let right_result = minus_impl(storage, a_right, b);
-                        storage.insert(a_value, &a_down, &right_result)
-                    },
-                    Ordering::Equal => {
-                        let down_result = minus_impl(storage, a_down, b_down);
-                        let right_result = minus_impl(storage, a_right, b_right);
-                        if down_result == *storage.empty_set()
-                        {
-                            right_result
-                        } 
-                        else 
-                        {
-                            storage.insert(a_value, &down_result, &right_result)
-                        }                
-                    },
-                    Ordering::Greater => {
-                        minus_impl(storage, a, b_right)
-                    }
-                }
-            }
-        )
     }
 }
 
