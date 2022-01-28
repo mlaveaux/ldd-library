@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, operations::*};
+use crate::{Ldd, Storage, operations::*, Value};
 
 use std::collections::HashSet;
 use rand::Rng;
@@ -6,10 +6,10 @@ use rand::Rng;
 ///! Functions in this module are only relevant for testing purposes.
 
 /// Returns a vector of the given length with random u64 values (from 0..max_value).
-pub fn random_vector(length: u64, max_value: u64) -> Vec<u64> 
+pub fn random_vector(length: usize, max_value: Value) -> Vec<Value> 
 {
     let mut rng = rand::thread_rng();    
-    let mut vector: Vec<u64> = Vec::new();
+    let mut vector: Vec<Value> = Vec::new();
     for _ in 0..length
     {
         vector.push(rng.gen_range(0..max_value));
@@ -19,7 +19,7 @@ pub fn random_vector(length: u64, max_value: u64) -> Vec<u64>
 }
 
 /// Returns a sorted vector of the given length with unique u64 values (from 0..max_value).
-pub fn random_sorted_vector(length: u64, max_value: u64) -> Vec<u64> 
+pub fn random_sorted_vector(length: usize, max_value: Value) -> Vec<Value> 
 {
     use rand::prelude::IteratorRandom;
 
@@ -30,9 +30,9 @@ pub fn random_sorted_vector(length: u64, max_value: u64) -> Vec<u64>
 }
 
 /// Returns a set of 'amount' vectors where every vector has the given length.
-pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<Vec<u64>>
+pub fn random_vector_set(amount: usize, length: usize, max_value: Value) ->  HashSet<Vec<Value>>
 {
-    let mut result: HashSet<Vec<u64>> = HashSet::new();
+    let mut result: HashSet<Vec<Value>> = HashSet::new();
 
     // Insert 'amount' number of vectors into the result.
     for _ in 0..amount
@@ -45,7 +45,7 @@ pub fn random_vector_set(amount: u64, length: u64, max_value: u64) ->  HashSet<V
 
 /// Returns an LDD containing all elements of the given iterator over vectors.
 pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
-    where I: Iterator<Item = &'a Vec<u64>>
+    where I: Iterator<Item = &'a Vec<Value>>
 {
     let mut result = storage.empty_set().clone();
 
@@ -59,9 +59,9 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
 }
 
 /// Returns project(vector, proj), see [project]. Requires proj to be sorted.
-pub fn project_vector(vector: &[u64], proj: &[u64]) -> Vec<u64>
+pub fn project_vector(vector: &[Value], proj: &[Value]) -> Vec<Value>
 {
-    let mut result = Vec::<u64>::new();
+    let mut result = Vec::<Value>::new();
     for i in proj
     {
         result.push(vector[*i as usize]);

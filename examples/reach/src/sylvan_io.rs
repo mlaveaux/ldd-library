@@ -3,6 +3,8 @@ use std::io::Read;
 use std::collections::HashMap;
 use std::error::Error;
 
+use ldd::Value;
+
 pub struct Transition
 {
     pub relation: ldd::Ldd,
@@ -93,7 +95,7 @@ impl SylvanReader
           let down = self.node_from_index(storage, down);
           let right = self.node_from_index(storage, right);
 
-          let ldd = storage.insert(value as u64, &down, &right);
+          let ldd = storage.insert(value as Value, &down, &right);
           self.indexed_set.insert(self.last_index, ldd);
           
           self.last_index += 1;
@@ -140,25 +142,25 @@ fn read_u64(file: &mut File) -> Result<u64, Box<dyn Error>>
 }
 
 /// Reads the read and write projections from the file.
-fn read_projection(file: &mut File) -> Result<(Vec<u64>,  Vec<u64>), Box<dyn Error>>
+fn read_projection(file: &mut File) -> Result<(Vec<Value>,  Vec<Value>), Box<dyn Error>>
 {
     let num_read = read_u32(file)?;
     let num_write = read_u32(file)?;
 
     // Read num_read integers for the read parameters.
-    let mut read_proj: Vec<u64> = Vec::new();
+    let mut read_proj: Vec<Value> = Vec::new();
     for _ in 0..num_read
     {
         let value = read_u32(file)?;
-        read_proj.push(value as u64);
+        read_proj.push(value as Value);
     }
 
     // Read num_write integers for the write parameters.
-    let mut write_proj: Vec<u64> = Vec::new();
+    let mut write_proj: Vec<Value> = Vec::new();
     for _ in 0..num_write
     {
         let value = read_u32(file)?;
-        write_proj.push(value as u64);
+        write_proj.push(value as Value);
     }
 
     Ok((read_proj, write_proj))

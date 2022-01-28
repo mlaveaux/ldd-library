@@ -1,9 +1,9 @@
-use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op, BinaryOperator, TernaryOperator, cache_unary_function, UnaryFunction};
+use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op, BinaryOperator, TernaryOperator, cache_unary_function, UnaryFunction, Value};
 
 use std::cmp::{self, Ordering};
 
 /// Returns an LDD containing only the given vector, i.e., { vector }.
-pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
+pub fn singleton(storage: &mut Storage, vector: &[Value]) -> Ldd
 {
     let mut root = storage.empty_vector().clone();
     let empty_set = storage.empty_set().clone();
@@ -20,7 +20,7 @@ pub fn singleton(storage: &mut Storage, vector: &[u64]) -> Ldd
 ///
 /// This function is useful to be able to cache the projection LDD instead of
 /// computing it from the projection array every time.
-pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
+pub fn compute_proj(storage: &mut Storage, proj: &[Value]) -> Ldd
 {
     // Compute length of proj.
     let length = match proj.iter().max()
@@ -30,7 +30,7 @@ pub fn compute_proj(storage: &mut Storage, proj: &[u64]) -> Ldd
     };
 
     // Convert projection vectors to meta information.
-    let mut result: Vec<u64> = Vec::new();
+    let mut result: Vec<Value> = Vec::new();
     for i in 0..length
     {
         let included = proj.contains(&i);
@@ -101,7 +101,7 @@ pub fn project(storage: &mut Storage, set: &Ldd, proj: &Ldd) -> Ldd
 ///
 /// The read and write projections are arrays of indices that are read,
 /// respectively written, by the corresponding sparse relation.
-pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]) -> Ldd
+pub fn compute_meta(storage: &mut Storage, read_proj: &[Value], write_proj: &[Value]) -> Ldd
 {
     // Compute length of meta.
     let length = cmp::max(
@@ -117,7 +117,7 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[u64], write_proj: &[u64]
         });
 
     // Convert projection vectors to meta.
-    let mut meta: Vec<u64> = Vec::new();
+    let mut meta: Vec<Value> = Vec::new();
     for i in 0..length
     {
         let read = read_proj.contains(&i);
@@ -358,7 +358,7 @@ pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 }
 
 /// Returns true iff the set contains the vector.
-pub fn element_of(storage: &Storage, vector: &[u64], ldd: &Ldd) -> bool
+pub fn element_of(storage: &Storage, vector: &[Value], ldd: &Ldd) -> bool
 {
     if vector.is_empty() {
         *ldd == *storage.empty_vector()
@@ -555,7 +555,7 @@ mod tests
 
         let ldd =  from_iter(&mut storage, set.iter());
 
-        let read_proj: Vec<u64> = vec![0,3,7,9];
+        let read_proj = random_sorted_vector(4,9);
         let meta = compute_meta(&mut storage, &read_proj, &[]);
 
         let proj_ldd = compute_proj(&mut storage, &read_proj);
@@ -577,7 +577,7 @@ mod tests
 
         let ldd = from_iter(&mut storage, set.iter());
 
-        let write_proj: Vec<u64> = vec![0,3,7,9];
+        let write_proj = random_sorted_vector(4,9);
         let meta = compute_meta(&mut storage, &[], &write_proj);
 
         let proj_ldd = compute_proj(&mut storage, &write_proj);
@@ -605,18 +605,18 @@ mod tests
         // The indices of the input vectors do not match the indices in the relation. The input vector is defined for all values, but the relation only
         // for relevant positions.
         let (read_rel_proj, write_rel_proj) = {
-            let mut read_rel_proj: Vec<u64> = Vec::new();
-            let mut write_rel_proj: Vec<u64> = Vec::new();
+            let mut read_rel_proj: Vec<Value> = Vec::new();
+            let mut write_rel_proj: Vec<Value> = Vec::new();
 
             let mut current = 0;
             for i in 0..10 
             {
-                if read_proj.contains(&(i as u64)) {
+                if read_proj.contains(&i) {
                     read_rel_proj.push(current);
                     current += 1;
                 }
                 
-                if  write_proj.contains(&(i as u64)) {
+                if  write_proj.contains(&i) {
                     write_rel_proj.push(current);
                     current += 1;
                 }
@@ -641,14 +641,14 @@ mod tests
         eprintln!("read {:?}, write {:?}, read_rel {:?} and write_rel {:?}", read_proj, write_proj, read_rel_proj, write_rel_proj);
 
         let expected = {
-            let mut expected: HashSet<Vec<u64>> = HashSet::new();
+            let mut expected: HashSet<Vec<Value>> = HashSet::new();
 
             // Compute relational_product(R, S, read_proj, write_proj) = { x[write_proj := y'] | project(x, read_proj) = x' and (x', y') in R and x in S }
             for x in set.iter()
             {
                 'next: for rel in relation.iter()
                 {
-                    let mut value: Vec<u64> = x.clone(); // The resulting vector.
+                    let mut value = x.clone(); // The resulting vector.
                     let x_prime = project_vector(&rel, &read_rel_proj);
                     let y_prime = project_vector(&rel, &write_rel_proj);
 
@@ -692,14 +692,14 @@ mod tests
         let mut storage = Storage::new();
         
         let set = random_vector_set(32, 10, 10);
-        let proj: Vec<u64> = vec![0,3,7,9];
+        let proj = random_sorted_vector(4,9);
 
         let ldd = from_iter(&mut storage, set.iter());
         let proj_ldd = compute_proj(&mut storage, &proj);
         let result = project(&mut storage, &ldd, &proj_ldd);
 
         // Compute a naive projection on the vector set.
-        let mut expected_result: HashSet<Vec<u64>> = HashSet::new();
+        let mut expected_result: HashSet<Vec<Value>> = HashSet::new();
         for element in &set
         {
             expected_result.insert(project_vector(element, &proj));

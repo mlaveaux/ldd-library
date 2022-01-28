@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data};
+use crate::{Ldd, Storage, Data, Value};
 
 // Returns an iterator over all right siblings of the given LDD.
 pub fn iter_right<'a>(storage: &'a Storage, ldd: &Ldd) -> IterRight<'a>
@@ -56,18 +56,18 @@ impl Iterator for IterRight<'_>
 pub struct Iter<'a>
 {
     storage: &'a Storage,
-    vector: Vec<u64>, // Stores the values of the returned vector.
+    vector: Vec<Value>, // Stores the values of the returned vector.
     stack: Vec<Ldd>, // Stores the stack for the depth-first search (only non 'true' or 'false' nodes)
 }
 
 impl Iterator for Iter<'_>
 {
-    type Item = Vec<u64>;
+    type Item = Vec<Value>;
 
     fn next(&mut self) -> Option<Self::Item>
     { 
         // Find the next vector by going down the chain.
-        let vector: Vec<u64>;     
+        let vector: Vec<Value>;     
         loop
         {
             let current = match self.stack.last() {

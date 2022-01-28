@@ -6,7 +6,6 @@ use rustc_hash::FxHashMap;
 
 use crate::operations::height;
 
-
 mod ldd;
 mod cache;
 
@@ -14,18 +13,21 @@ pub use self::cache::*;
 pub use self::ldd::Ldd;
 use self::ldd::ProtectionSet;
 
+pub type Value = u32;
+
 /// This is the LDD node(value, down, right) with some additional meta data.
 pub struct Node
 {
-    value: u64,
+    value: Value,
     down: usize,
     right: usize,
+
     marked: bool,
 }
 
 impl Node
 {
-    fn new(value: u64, down: usize, right: usize) -> Node
+    fn new(value: Value, down: usize, right: usize) -> Node
     {
         Node {value, down, right, marked: false}
     }
@@ -58,7 +60,7 @@ impl Hash for Node
 }
 
 /// This is the user facing data of a [Node].
-pub struct Data(pub u64, pub Ldd, pub Ldd);
+pub struct Data(pub Value, pub Ldd, pub Ldd);
 
 /// The storage that implements the maximal sharing behaviour. Meaning that
 /// identical nodes (same value, down and right) have a unique index in the node
@@ -117,7 +119,7 @@ impl Storage
     }
 
     /// Create a new LDD node(value, down, right)
-    pub fn insert(&mut self, value: u64, down: &Ldd, right: &Ldd) -> Ldd
+    pub fn insert(&mut self, value: Value, down: &Ldd, right: &Ldd) -> Ldd
     {
         // These invariants ensure that the result is a valid LDD.
         debug_assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
@@ -139,7 +141,7 @@ impl Storage
             }
             self.count_until_collection = self.table.len() as u64;
         }
-
+        
         let new_node = Node::new(value, down.index(), right.index());
         Ldd::new(&self.protection_set,
             *self.index.entry(new_node).or_insert_with(
@@ -225,7 +227,7 @@ impl Storage
     }
 
     /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn value(&self, ldd: &Ldd) -> u64
+    pub fn value(&self, ldd: &Ldd) -> Value
     {
         let node = &self.table[ldd.index()];
         node.value
@@ -251,13 +253,8 @@ impl Storage
     pub fn get(&self, ldd: &Ldd) -> Data
     {
         self.verify_ldd(ldd);     
-        let data : (u64, usize, usize);
-        {        
-            let node = &self.table[ldd.index()];
-            data = (node.value, node.down, node.right);
-        }
-
-        Data(data.0, Ldd::new(&self.protection_set, data.1), Ldd::new(&self.protection_set, data.2))
+        let node = &self.table[ldd.index()];
+        Data(node.value, Ldd::new(&self.protection_set, node.down), Ldd::new(&self.protection_set, node.right))
     }
 
     // Asserts whether the given ldd is valid.
