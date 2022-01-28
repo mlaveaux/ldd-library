@@ -117,11 +117,6 @@ impl ProtectionSet
         self.number_of_insertions += 1;
 
         match self.free {
-            None => {
-                // If free list is empty insert new entry into roots.
-                self.roots.push((index, true));
-                self.roots.len() - 1
-            }
             Some(first) => {
                 let next = self.roots[first];
                 if first == next.0 {
@@ -135,6 +130,11 @@ impl ProtectionSet
                 self.roots[first] = (index, true);
                 first
             }
+            None => {
+                // If free list is empty insert new entry into roots.
+                self.roots.push((index, true));
+                self.roots.len() - 1
+            }
         }
     }
     
@@ -142,11 +142,11 @@ impl ProtectionSet
     fn unprotect(&mut self, root: usize)
     {
         match self.free {
-            None => {
-                self.roots[root] = (root, false);
-            }
             Some(next) => {
                 self.roots[root] = (next, false);
+            }
+            None => {
+                self.roots[root] = (root, false);
             }
         };
         

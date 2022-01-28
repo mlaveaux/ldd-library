@@ -20,22 +20,23 @@ pub struct Node
 {
     value: Value,
     down: usize,
-    right: usize,
+    right: usize, // If !filled then right is the next freelist element.
 
     marked: bool,
+    filled: bool, // Indicates whether this position in the table represents a valid node.
 }
 
 impl Node
 {
     fn new(value: Value, down: usize, right: usize) -> Node
     {
-        Node {value, down, right, marked: false}
+        Node {value, down, right, marked: false, filled: true}
     }
     
     /// Returns false if the node has been garbage collected.
     pub fn is_valid(&self) -> bool
     {
-        !(self.down == 0 && self.right == 1) // These are values that can only be set during garbage collection.
+        self.filled        
     }
 }
 
@@ -71,8 +72,9 @@ pub struct Storage
     protection_set: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.
     table: Vec<Node>,
     index: FxHashMap<Node, usize>,
-    free: Vec<usize>, // A list of free nodes.
     cache: OperationCache,
+
+    free: Option<usize>, // A list of free nodes.
 
     count_until_collection: u64, // Count down until the next garbage collection.
     enable_garbage_collection: bool, // Whether to enable automatic garbage collection based on heuristics.
@@ -96,7 +98,6 @@ impl Storage
         Self { 
             index: HashMap::default(),
             protection_set: shared.clone(),
-            free: Vec::new(),
             table:  vec![
                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
                 Node::new(0, 0, 0),
@@ -105,6 +106,7 @@ impl Storage
             cache: OperationCache::new(Rc::clone(&shared)),
 
             count_until_collection: 10000,
+            free: None,
             enable_garbage_collection: true,
             enable_performance_metrics: false,
             empty_set: Ldd::new(&shared, 0),
@@ -129,7 +131,7 @@ impl Storage
 
         if right != self.empty_set()
         {
-            debug_assert_eq!(height(self, down) + 1, height(self, right), "height should match the right node height.");
+            debug_assert_eq!(height(self, down) + 1, height(self, right), "height of node {} should match the right node {} height.", down.index(), right.index());
             debug_assert!(value < self.value(right), "value should be less than right node value.");
         }
         
@@ -143,28 +145,37 @@ impl Storage
         }
         
         let new_node = Node::new(value, down.index(), right.index());
-        Ldd::new(&self.protection_set,
-            *self.index.entry(new_node).or_insert_with(
+        let index = *self.index.entry(new_node).or_insert_with(
             || 
             {
                 let node = Node::new(value, down.index(), right.index());
 
-                match self.free.pop()
-                {
-                    Some(index) => {
-                        // Reuse existing position in table.
-                        self.table[index] = node;
-                        index
+                match self.free {
+                    Some(first) =>
+                    {
+                        let next = self.table[first].right;
+                        if first == next {
+                            // The list is now empty as its first element points to itself.
+                            self.free = None;
+                        } else {
+                            // Update free to be the next element in the list.
+                            self.free = Some(next);
+                        }
+        
+                        self.table[first] = node;
+                        first
                     }
-                    None => {
+                    None =>
+                    {
                         // No free positions so insert new.
                         self.count_until_collection -= 1;
                         self.table.push(node);
                         self.table.len() - 1
                     }
                 }
-            })
-        )
+            });
+        
+        Ldd::new(&self.protection_set, index)
     }
 
     /// Cleans up all LDDs that are unreachable from the root LDDs.
@@ -180,26 +191,45 @@ impl Storage
         }
         
         // Collect all garbage.
+        let mut number_of_collections: usize = 0;
         for (index, node) in self.table.iter_mut().enumerate()
         {
             if node.marked
             {
+                debug_assert!(node.is_valid(), "Should never mark a node that is not valid.");
                 node.marked = false
             }
             else
             {
-                self.free.push(index);
-                self.index.remove(node);
+                self.index.remove(node); // First rmove the node as mutating it changes the hash.
+                                
+                match self.free {
+                    Some(next) => {
+                        node.right = next;
+                    }
+                    None => {
+                        node.right = index;
+                    }
+                };
+                self.free = Some(index);
+                node.filled = false;
 
-                // Insert garbage values so that the LDD is invalid (down node is empty set).
-                node.value = 0;
-                node.down = 0;
-                node.right = 1;
+                number_of_collections += 1;
+            }
+        }
+
+        // Check whether the direct children of a valid node are valid (this implies that the whole tree is valid if the root is valid).
+        for node in self.table.iter()
+        {
+            if node.is_valid()
+            {
+                debug_assert!(self.table[node.down].is_valid(), "The down node of a valid node must be valid.");
+                debug_assert!(self.table[node.right].is_valid(), "The right node of a valid node must be valid.");
             }
         }
 
         if self.enable_performance_metrics {
-            println!("Collected {} elements", self.free.len());
+            println!("Collected {} elements", number_of_collections);
         }
     }
     
@@ -229,6 +259,7 @@ impl Storage
     /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn value(&self, ldd: &Ldd) -> Value
     {
+        self.verify_ldd(ldd);
         let node = &self.table[ldd.index()];
         node.value
     }
@@ -287,6 +318,7 @@ fn mark_node(table: &mut Vec<Node>, stack: &mut Vec<usize>, root: usize)
     while let Some(current) = stack.pop()
     {            
         let node = &mut table[current];
+        debug_assert!(node.is_valid(), "Should never mark a node that is not valid.");
         if node.marked
         {
             continue
@@ -294,14 +326,15 @@ fn mark_node(table: &mut Vec<Node>, stack: &mut Vec<usize>, root: usize)
         else
         {
             node.marked = true;
-            if current != 0 && current != 1 {
+            if current != 0 && current != 1
+            {
                 stack.push(node.down);
                 stack.push(node.right);
             }
         }
     }
     
-    debug_assert!(stack.is_empty(), "When marking finishes the stack should be empty");
+    debug_assert!(stack.is_empty(), "When marking finishes the stack should be empty.");
 } 
 
 #[cfg(test)]
@@ -312,6 +345,24 @@ mod tests
     use crate::operations::singleton;
 
     #[test]
+    fn test_garbage_collection_small()
+    {
+        let mut storage = Storage::new();
+
+        let _child: Ldd;
+        {
+            // Make sure that this set goes out of scope, but keep a reference to some child ldd.
+            let vector = random_vector(10, 10);
+            let ldd = singleton(&mut storage, &vector);
+
+            _child = storage.get(&ldd).1;
+            storage.garbage_collect();
+        }
+
+        storage.garbage_collect();
+    }
+    
+    #[test]
     fn test_garbage_collection()
     {
         let mut storage = Storage::new();
@@ -319,12 +370,10 @@ mod tests
         let _child: Ldd;
         {
             // Make sure that this set goes out of scope, but keep a reference to some child ldd.
-            //let set = random_vector_set(1, 10);
-            //let ldd = from_hashset(&mut storage, &set);
-            let vector = random_vector(10, 10);
-            let ldd = singleton(&mut storage, &vector);
+            let vector = random_vector_set(2000, 10, 2);
+            let ldd = from_iter(&mut storage, vector.iter());
 
-            _child = storage.get(&ldd).1;
+            _child = storage.get(&storage.get(&ldd).1).1;
             storage.garbage_collect();
         }
 
