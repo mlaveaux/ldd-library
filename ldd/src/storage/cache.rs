@@ -108,8 +108,7 @@ pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a
     let key = a.index();
     if let Some(result) = storage.operation_cache().get_cache1(&operator).get(&key) 
     {
-        let result = *result; // Necessary to decouple borrow from storage and the call to create.
-        result
+        *result
     }
     else 
     {

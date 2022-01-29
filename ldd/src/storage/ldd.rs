@@ -2,12 +2,14 @@
 use std::fmt::{self, Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
-/// Every LDD points to its root node in the [Storage] instance for maximum sharing.
+/// Every Ldd points to its root node in the [Storage] instance for maximal
+/// sharing. These Ldd instances can only be created from the storage.
 pub struct Ldd
 {
-    index: usize, // Index in the node table.
+    index: usize, // Reference in the node table.
     root: usize, // Index in the root set.
     protection_set: Rc<RefCell<ProtectionSet>>,
 }
@@ -24,14 +26,18 @@ impl Ldd
     {
         self.index
     }
-}
 
+    pub fn borrow(&self) -> LddRef<'_>
+    {
+        LddRef::new(self.index)
+    }
+}
 
 impl Clone for Ldd
 {
     fn clone(&self) -> Self
     {
-        Ldd::new(&self.protection_set, self.index)
+        Ldd::new(&self.protection_set, self.index())
     }
 }
 
@@ -48,7 +54,7 @@ impl PartialEq for Ldd
     fn eq(&self, other: &Self) -> bool
     {
         debug_assert!(Rc::ptr_eq(&self.protection_set, &other.protection_set), "Both LDDs should refer to the same storage."); 
-        self.index == other.index
+        self.index() == other.index()
     }
 }
 
@@ -56,7 +62,7 @@ impl Debug for Ldd
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result
     {
-        write!(f, "index: {}", self.index)
+        write!(f, "index: {}", self.index())
     }
 }
 
@@ -69,12 +75,43 @@ impl Hash for Ldd
 
 impl Eq for Ldd {}
 
+/// The LddRef is a reference to an existing [Ldd] instance. This can be used to
+/// avoid explicit protections that are performed when creating an [Ldd] instance.
+#[derive(Hash, PartialEq, Eq, Debug)]
+pub struct LddRef<'a>
+{
+    index: usize, // Index in the node table.
+    marker: PhantomData<&'a ()>
+}
+
+impl<'a> LddRef<'a>
+{
+    /// TODO: This function should only be called by [Storage] and [Ldd]
+    pub fn new(index: usize) -> LddRef<'a>
+    {
+        LddRef { index, marker: PhantomData }
+    }
+
+    pub fn index(&self) -> usize
+    {
+        self.index
+    }
+}
+
+impl<'a> PartialEq<Ldd> for LddRef<'a>
+{
+    fn eq(&self, other: &Ldd) -> bool
+    { 
+        self.index == other.index()
+    }
+}
+
 /// The protection set keeps track of LDD nodes that should not be garbage
-/// collected, i.e., that are protected.
+/// collected since they are being referenced by [Ldd] instances.
 #[derive(Default)]
 pub struct ProtectionSet
 {    
-    roots: Vec<(usize, bool)>, // Every ldd has an index in this table that points to the node.
+    roots: Vec<(usize, bool)>, // The set of root active nodes.
     free: Option<usize>,
     number_of_insertions: u64,
 }
@@ -90,13 +127,13 @@ impl ProtectionSet
         }
     }
 
-    /// Returns The number of insertions into the protection set.
+    /// Returns the number of insertions into the protection set.
     pub fn number_of_insertions(&self) -> u64 
     {
         self.number_of_insertions 
     }
 
-    /// Returns maximum number of active ldd instances.
+    /// Returns maximum number of active [Ldd] instances.
     pub fn maximum_size(&self) -> usize 
     {
         self.roots.capacity() 
@@ -111,8 +148,8 @@ impl ProtectionSet
         }
     }
 
-    /// Protect the given node to prevent garbage collection.
-    fn protect(&mut self, index: usize) -> usize
+    /// Protect the given root node to prevent garbage collection.
+    fn protect(&mut self, root: usize) -> usize
     {
         self.number_of_insertions += 1;
 
@@ -127,30 +164,31 @@ impl ProtectionSet
                     self.free = Some(next.0);
                 }
 
-                self.roots[first] = (index, true);
+                self.roots[first] = (root, true);
                 first
             }
             None => {
                 // If free list is empty insert new entry into roots.
-                self.roots.push((index, true));
+                self.roots.push((root, true));
                 self.roots.len() - 1
             }
         }
     }
     
-    /// Remove protection from the given LDD, note that root is here the index returned by [protect].
-    fn unprotect(&mut self, root: usize)
+    /// Remove protection from the given LDD node. Note that index must be the
+    /// index returned by the [protect] call.
+    fn unprotect(&mut self, index: usize)
     {
         match self.free {
             Some(next) => {
-                self.roots[root] = (next, false);
+                self.roots[index] = (next, false);
             }
             None => {
-                self.roots[root] = (root, false);
+                self.roots[index] = (index, false);
             }
         };
         
-        self.free = Some(root);
+        self.free = Some(index);
     }
 }
 
@@ -184,7 +222,7 @@ impl Iterator for ProtSetIter<'_>
 mod tests
 {
     use super::*;
-    use crate::test_utility::*;
+    use crate::{test_utility::*};
 
     #[test]
     fn test_protection_set()

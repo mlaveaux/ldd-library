@@ -25,16 +25,18 @@ The `reach` tool can be compared to the `lddmc` tool provided in [Sylvan](https:
 | bakery.5.ldd          |   12.04          |                   |   21.56       |
 | bakery.6.ldd          |   11.95          |                   |   17.29       |
 | bakery.7.ldd          |   45.46          |                   |   91.05       |
-| blocks.2.ldd          |    0.18          |                   |    n/a        |
-| blocks.3.ldd          |    3.46          |                   |    n/a        |
-| blocks.4.ldd          |  327.03          |                   |    n/a        |
+| blocks.2.ldd          |    0.18          |                   |    n/a*       |
+| blocks.3.ldd          |    3.46          |                   |    n/a*       |
+| blocks.4.ldd          |  327.03          |                   |    n/a*       |
 | collision.4.ldd       |   54.25          |                   |  140.78       |
 | collision.5.ldd       |  322.08          |                   | 1048.82       |
-| collision.6.ldd       | 4930.45          |                   |     OOM       |
+| collision.6.ldd       | 4930.45          |                   |   OOM**       |
 | lifts.6.ldd           |    2.49          |                   |    7.65       |
 | lifts.7.ldd           |   20.03          |                   |   46.70       |
 | schedule_world.2.ldd  |    1.80          |                   |    3.92       |
 | schedule_world.2.ldd  |   63.91          |                   |  175.95       |
+
+\* For these benchmarks the `reach` tool indicates that the LDD was not valid; so that is most likely a bug. \*\* This benchmark requires a lot of memory and the ldd-library used 32 bytes per LDD node as opposed to 16 bytes in Sylvan. This has since been improved to 24 bytes per LDD node for the ldd-library.
 
 # Profiling
 

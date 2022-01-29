@@ -10,7 +10,7 @@ mod ldd;
 mod cache;
 
 pub use self::cache::*;
-pub use self::ldd::Ldd;
+pub use self::ldd::{Ldd, LddRef};
 use self::ldd::ProtectionSet;
 
 pub type Value = u32;
@@ -176,6 +176,12 @@ impl Storage
             });
         
         Ldd::new(&self.protection_set, index)
+    }
+
+    /// Upgrade an [LddRef] to a protected [Ldd] instance.
+    pub fn upgrade(&mut self, ldd: LddRef) -> Ldd
+    {
+        Ldd::new(&self.protection_set, ldd.index())
     }
 
     /// Cleans up all LDDs that are unreachable from the root LDDs.
