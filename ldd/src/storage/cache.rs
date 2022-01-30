@@ -102,8 +102,8 @@ impl OperationCache
 
 
 /// Implements an operation cache for a unary LDD operator.
-pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a: &Ldd, f: F) -> usize
-    where F: Fn(&mut Storage, &Ldd) -> usize
+pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a: LddRef, f: F) -> usize
+    where F: Fn(&mut Storage, LddRef) -> usize
 {
     let key = a.index();
     if let Some(result) = storage.operation_cache().get_cache1(&operator).get(&key) 
@@ -150,8 +150,8 @@ pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, 
 }
 
 /// Implements an operation cache for a terniary LDD operator.
-pub fn cache_terniary_op<F>(storage: &mut Storage, operator: TernaryOperator, a: &Ldd, b: &Ldd, c: &Ldd, f: F) -> Ldd
-    where F: Fn(&mut Storage, &Ldd, &Ldd, &Ldd) -> Ldd
+pub fn cache_terniary_op<F>(storage: &mut Storage, operator: TernaryOperator, a: LddRef, b: LddRef, c: LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, LddRef, LddRef, LddRef) -> Ldd
 {
     let key = (a.index(), b.index(), c.index());
     if let Some(result) = storage.operation_cache().get_cache3(&operator).get(&key) 

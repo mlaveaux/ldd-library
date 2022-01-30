@@ -185,7 +185,7 @@ impl Storage
     }
 
     /// Upgrade an [LddRef] to a protected [Ldd] instance.
-    pub fn protect(&mut self, ldd: LddRef) -> Ldd
+    pub fn protect(&mut self, ldd: &LddRef) -> Ldd
     {
         Ldd::new(&self.protection_set, ldd.index())
     }
@@ -303,7 +303,8 @@ impl Storage
     }
 
     /// Returns a DataRef tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn get_ref<'a, T: LddArg<'a>>(&self, ldd: &'a T) -> DataRef<'a>
+    pub fn get_ref<'a, T>(&self, ldd: &'a T) -> DataRef<'a>
+        where T: LddArg<'a>
     {
         let ldd = ldd.borrow();
 

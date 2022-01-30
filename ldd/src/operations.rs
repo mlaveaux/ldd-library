@@ -154,29 +154,36 @@ pub fn compute_meta(storage: &mut Storage, read_proj: &[Value], write_proj: &[Va
 ///   - 2 = only in write_proj.
 ///   - 3 = in both read_proj and write_proj (read phase).
 ///   - 4 = in both read_proj and write_proj (write phase).
-pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ldd) -> Ldd
+pub fn relational_product<'a, T, U, V>(storage: &mut Storage, set: &'a T, rel: &'a U, meta: &'a V) -> Ldd
+    where T: LddArg<'a>, 
+          U: LddArg<'a>,
+          V: LddArg<'a>,
 {
-    debug_assert_ne!(meta, storage.empty_set(), "proj must be a singleton");
+    let set = set.borrow();
+    let rel = rel.borrow();
+    let meta = meta.borrow();
 
-    if meta == storage.empty_vector() {
+    debug_assert_ne!(meta, *storage.empty_set(), "proj must be a singleton");
+
+    if meta == *storage.empty_vector() {
         // If meta is not defined then the rest is not in the relation (meta is always zero)
-        set.clone()
-    } else if set == storage.empty_set() || rel == storage.empty_set() {
+        storage.protect(&set)
+    } else if set == *storage.empty_set() || rel == *storage.empty_set() {
         storage.empty_set().clone()
     } else {
         cache_terniary_op(storage, TernaryOperator::RelationalProduct, set, rel, meta, 
         |storage, set, rel, meta| 
         {            
-            let Data(meta_value, meta_down, _) = storage.get(meta);
+            let DataRef(meta_value, meta_down, _) = storage.get_ref(&meta);
 
             match meta_value
             {
                 0 => {
                     // Consider all values on this level part of the output and continue with rest.
-                    let Data(value, down, right) = storage.get(set);
+                    let DataRef(value, down, right) = storage.get_ref(&set);
 
-                    let right_result = relational_product(storage, &right, rel, meta);
-                    let down_result = relational_product(storage, &down, rel, &meta_down);
+                    let right_result = relational_product(storage, &right, &rel, &meta);
+                    let down_result = relational_product(storage, &down, &rel, &meta_down);
                     if down_result == *storage.empty_set()
                     {
                         right_result
@@ -188,16 +195,16 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                 }
                 1 => {
                     // Read the values present in the relation and continue with these values in the set.
-                    let Data(set_value, set_down, set_right) = storage.get(set);
-                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    let DataRef(set_value, set_down, set_right) = storage.get_ref(&set);
+                    let DataRef(rel_value, rel_down, rel_right) = storage.get_ref(&rel);
                     
                     match set_value.cmp(&rel_value) {
                         Ordering::Less => {
-                            relational_product(storage, &set_right, rel, meta)                        
+                            relational_product(storage, &set_right, &rel, &meta)                        
                         }                    
                         Ordering::Equal => {
                             let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
-                            let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                            let right_result = relational_product(storage, &set_right, &rel_right, &meta);
                             if down_result == *storage.empty_set()
                             {
                                 right_result
@@ -208,29 +215,29 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                             }  
                         }
                         Ordering::Greater => {
-                            relational_product(storage, set, &rel_right, meta)
+                            relational_product(storage, &set, &rel_right, &meta)
                         }
                     }
                 }
                 2 => {
                     // All values in set should be considered.
                     let mut combined = storage.empty_set().clone(); 
-                    let mut current = set.clone();            
+                    let mut current = storage.protect(&set);            
                     loop {
-                        let Data(_, set_down, set_right) = storage.get(&current);
+                        let DataRef(_, set_down, set_right) = storage.get_ref(&current);
                         combined = union(storage, &combined, &set_down);
 
                         if set_right == *storage.empty_set() {
                             break;
                         }
-                        current = set_right;
+                        current = storage.protect(&set_right);
                     } 
                     
                     // Write the values present in the relation.
-                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    let DataRef(rel_value, rel_down, rel_right) = storage.get_ref(&rel);
 
                     let down_result = relational_product(storage, &combined, &rel_down, &meta_down);
-                    let right_result = relational_product(storage, set, &rel_right, meta);
+                    let right_result = relational_product(storage, &set, &rel_right, &meta);
                     if down_result == *storage.empty_set()
                     {
                         right_result
@@ -241,29 +248,29 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
                     }
                 }
                 3 => {
-                    let Data(set_value, set_down, set_right) = storage.get(set);
-                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    let DataRef(set_value, set_down, set_right) = storage.get_ref(&set);
+                    let DataRef(rel_value, rel_down, rel_right) = storage.get_ref(&rel);
                     
                     match set_value.cmp(&rel_value) {
                         Ordering::Less => {
-                            relational_product(storage, &set_right, rel, meta)                        
+                            relational_product(storage, &set_right, &rel, &meta)                        
                         }                    
                         Ordering::Equal => {
                             let down_result = relational_product(storage, &set_down, &rel_down, &meta_down);
-                            let right_result = relational_product(storage, &set_right, &rel_right, meta);
+                            let right_result = relational_product(storage, &set_right, &rel_right, &meta);
                             union(storage, &down_result, &right_result)
                         }
                         Ordering::Greater => {
-                            relational_product(storage, set, &rel_right, meta)
+                            relational_product(storage, &set, &rel_right, &meta)
                         }
                     }
                 }
                 4 => {                
                     // Write the values present in the relation.
-                    let Data(rel_value, rel_down, rel_right) = storage.get(rel);
+                    let DataRef(rel_value, rel_down, rel_right) = storage.get_ref(&rel);
 
-                    let down_result = relational_product(storage, set, &rel_down, &meta_down);
-                    let right_result = relational_product(storage, set, &rel_right, meta);
+                    let down_result = relational_product(storage, &set, &rel_down, &meta_down);
+                    let right_result = relational_product(storage, &set, &rel_right, &meta);
                     if down_result == *storage.empty_set()
                     {
                         right_result
@@ -282,7 +289,9 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
 }
 
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
-pub fn minus<'a, T: LddArg<'a>, U: LddArg<'a>>(storage: &mut Storage, a: &'a T, b: &'a U) -> Ldd
+pub fn minus<'a, T, U>(storage: &mut Storage, a: &'a T, b: &'a U) -> Ldd
+    where T: LddArg<'a>, 
+          U: LddArg<'a>
 {
     let a = a.borrow();
     let b = b.borrow();
@@ -290,7 +299,7 @@ pub fn minus<'a, T: LddArg<'a>, U: LddArg<'a>>(storage: &mut Storage, a: &'a T, 
     if a == b || a == *storage.empty_set() {
         storage.empty_set().clone()
     } else if b == *storage.empty_set() {
-        storage.protect(a)
+        storage.protect(&a)
     } else {
         cache_binary_op(storage, BinaryOperator::Minus, a, b, 
             |storage, a, b|
@@ -332,11 +341,11 @@ pub fn union<'a, T, U>(storage: &mut Storage, a: &'a T, b: &'a U) -> Ldd
     let b = b.borrow();
 
     if a == b {
-        storage.protect(a)
+        storage.protect(&a)
     } else if a == *storage.empty_set() {
-        storage.protect(b)
+        storage.protect(&b)
     } else if b == *storage.empty_set() {
-        storage.protect(a)
+        storage.protect(&a)
     } else {
         cache_comm_binary_op(storage, BinaryOperator::Union, a, b, 
             |storage, a, b|
@@ -386,11 +395,14 @@ pub fn element_of(storage: &Storage, vector: &[Value], ldd: &Ldd) -> bool
 }
 
 /// Returns the number of elements in the set.
-pub fn len(storage: &mut Storage, set: &Ldd) -> usize
+pub fn len<'a, T>(storage: &mut Storage, set: &'a T) -> usize
+    where T: LddArg<'a>
 {
-    if set == storage.empty_set() {
+    let set = set.borrow();
+    
+    if set == *storage.empty_set() {
         0
-    } else if set == storage.empty_vector() {
+    } else if set == *storage.empty_vector() {
         1
     } else {
         cache_unary_function(storage, UnaryFunction::Len, set, 
@@ -398,13 +410,13 @@ pub fn len(storage: &mut Storage, set: &Ldd) -> usize
             {
                 let mut result: usize = 0;
 
-                let mut current = a.clone();
+                let mut current = storage.protect(&a);
                 while current != *storage.empty_set()
                 {
                     // Progress to the right LDD.
-                    let Data(_, down, right) = storage.get(&current);                        
+                    let DataRef(_, down, right) = storage.get_ref(&current);                        
                     result += len(storage, &down);
-                    current = right.clone();   
+                    current = storage.protect(&right);
                 }
 
                 result
