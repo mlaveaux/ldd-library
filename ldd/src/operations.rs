@@ -1,4 +1,4 @@
-use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op, BinaryOperator, TernaryOperator, cache_unary_function, UnaryFunction, Value};
+use crate::{Ldd, Storage, Data, iterators::*, cache_terniary_op, cache_comm_binary_op, cache_binary_op, BinaryOperator, TernaryOperator, cache_unary_function, UnaryFunction, Value, DataRef, LddArg};
 
 use std::cmp::{self, Ordering};
 
@@ -282,22 +282,25 @@ pub fn relational_product(storage: &mut Storage, set: &Ldd, rel: &Ldd, meta: &Ld
 }
 
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
-pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
+pub fn minus<'a, T: LddArg<'a>, U: LddArg<'a>>(storage: &mut Storage, a: &'a T, b: &'a U) -> Ldd
 {
-    if a == b || a == storage.empty_set() {
+    let a = a.borrow();
+    let b = b.borrow();
+
+    if a == b || a == *storage.empty_set() {
         storage.empty_set().clone()
-    } else if b == storage.empty_set() {
-        a.clone()
+    } else if b == *storage.empty_set() {
+        storage.protect(a)
     } else {
         cache_binary_op(storage, BinaryOperator::Minus, a, b, 
             |storage, a, b|
             {
-                let Data(a_value, a_down, a_right) = storage.get(&a);
-                let Data(b_value, b_down, b_right) = storage.get(&b);
+                let DataRef(a_value, a_down, a_right) = storage.get_ref(&a);
+                let DataRef(b_value, b_down, b_right) = storage.get_ref(&b);
         
                 match a_value.cmp(&b_value) {
                     Ordering::Less => {
-                        let right_result = minus(storage, &a_right, b);
+                        let right_result = minus(storage, &a_right, &b);
                         storage.insert(a_value, &a_down, &right_result)
                     },
                     Ordering::Equal => {
@@ -313,7 +316,7 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
                         }                
                     },
                     Ordering::Greater => {
-                        minus(storage, a, &b_right)
+                        minus(storage, &a, &b_right)
                     }
                 }
             }
@@ -322,24 +325,28 @@ pub fn minus(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
 }
 
 /// Returns the union of the given LDDs, i.e., a ∪ b.
-pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
+pub fn union<'a, T, U>(storage: &mut Storage, a: &'a T, b: &'a U) -> Ldd
+    where T: LddArg<'a>, U: LddArg<'a>
 {
+    let a = a.borrow();
+    let b = b.borrow();
+
     if a == b {
-        a.clone()
-    } else if a == storage.empty_set() {
-        b.clone()
-    } else if b == storage.empty_set() {
-        a.clone()
+        storage.protect(a)
+    } else if a == *storage.empty_set() {
+        storage.protect(b)
+    } else if b == *storage.empty_set() {
+        storage.protect(a)
     } else {
         cache_comm_binary_op(storage, BinaryOperator::Union, a, b, 
             |storage, a, b|
             {
-                let Data(a_value, a_down, a_right) = storage.get(&a);
-                let Data(b_value, b_down, b_right) = storage.get(&b);
+                let DataRef(a_value, a_down, a_right) = storage.get_ref(&a);
+                let DataRef(b_value, b_down, b_right) = storage.get_ref(&b);
         
                 match a_value.cmp(&b_value) {
                     Ordering::Less => {
-                        let result = union(storage, &a_right, b);
+                        let result = union(storage, &a_right, &b);
                         storage.insert(a_value, &a_down, &result)
                     },
                     Ordering::Equal => {
@@ -348,7 +355,7 @@ pub fn union(storage: &mut Storage, a: &Ldd, b: &Ldd) -> Ldd
                         storage.insert(a_value, &down_result, &right_result)
                     },
                     Ordering::Greater => {
-                        let result = union(storage, a, &b_right);
+                        let result = union(storage, &a, &b_right);
                         storage.insert(b_value, &b_down, &result)
                     }
                 }
@@ -408,14 +415,17 @@ pub fn len(storage: &mut Storage, set: &Ldd) -> usize
 }
 
 /// Returns the height of the LDD tree.
-pub fn height(storage: &Storage, ldd: &Ldd) -> u64
+pub fn height<'a, T>(storage: &Storage, ldd: &'a T) -> u64
+    where T: LddArg<'a>
 {
-    if ldd == storage.empty_set() || ldd == storage.empty_vector() {
+    let ldd = ldd.borrow();
+
+    if ldd == *storage.empty_set() || ldd == *storage.empty_vector() {
         0
     }
     else {
         // Since all children have the same height we only have to look at the down node.
-        let Data(_, down, _) = storage.get(ldd);
+        let DataRef(_, down, _) = storage.get_ref(&ldd);
 
         height(storage, &down) + 1        
     }

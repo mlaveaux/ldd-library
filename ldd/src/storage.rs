@@ -10,8 +10,8 @@ mod ldd;
 mod cache;
 
 pub use self::cache::*;
-pub use self::ldd::{Ldd, LddRef};
-use self::ldd::ProtectionSet;
+pub use self::ldd::{Ldd, LddRef, LddArg};
+use self::ldd::{ProtectionSet};
 
 pub type Value = u32;
 
@@ -62,6 +62,9 @@ impl Hash for Node
 
 /// This is the user facing data of a [Node].
 pub struct Data(pub Value, pub Ldd, pub Ldd);
+
+/// This is the user facing data of a [Node] as references.
+pub struct DataRef<'a>(pub Value, pub LddRef<'a>, pub LddRef<'a>);
 
 /// The storage that implements the maximal sharing behaviour. Meaning that
 /// identical nodes (same value, down and right) have a unique index in the node
@@ -121,18 +124,21 @@ impl Storage
     }
 
     /// Create a new LDD node(value, down, right)
-    pub fn insert(&mut self, value: Value, down: &Ldd, right: &Ldd) -> Ldd
+    pub fn insert<'a, T: LddArg<'a>, U: LddArg<'a>>(&mut self, value: Value, down: &'a T, right: &'a U) -> Ldd
     {
+        let down = down.borrow();
+        let right = right.borrow();
+
         // These invariants ensure that the result is a valid LDD.
-        debug_assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
-        debug_assert_ne!(right, self.empty_vector(), "right node can never be the empty vector."); 
+        debug_assert_ne!(down, *self.empty_set(), "down node can never be the empty set.");
+        debug_assert_ne!(right, *self.empty_vector(), "right node can never be the empty vector."); 
         debug_assert!(down.index() < self.table.len(), "down node not in table.");
         debug_assert!(right.index() < self.table.len(), "right not not in table.");
 
-        if right != self.empty_set()
+        if right != *self.empty_set()
         {
-            debug_assert_eq!(height(self, down) + 1, height(self, right), "height of node {} should match the right node {} height.", down.index(), right.index());
-            debug_assert!(value < self.value(right), "value should be less than right node value.");
+            debug_assert_eq!(height(self, &down) + 1, height(self, &right), "height of node {} should match the right node {} height.", down.index(), right.index());
+            debug_assert!(value < self.value(&right), "value should be less than right node value.");
         }
         
         if self.count_until_collection == 0 
@@ -179,7 +185,7 @@ impl Storage
     }
 
     /// Upgrade an [LddRef] to a protected [Ldd] instance.
-    pub fn upgrade(&mut self, ldd: LddRef) -> Ldd
+    pub fn protect(&mut self, ldd: LddRef) -> Ldd
     {
         Ldd::new(&self.protection_set, ldd.index())
     }
@@ -263,17 +269,17 @@ impl Storage
     }
 
     /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn value(&self, ldd: &Ldd) -> Value
+    pub fn value<'a, T: LddArg<'a>>(&self, ldd: &'a T) -> Value
     {
-        self.verify_ldd(ldd);
-        let node = &self.table[ldd.index()];
+        self.verify_ldd(&ldd.borrow());
+        let node = &self.table[ldd.borrow().index()];
         node.value
     }
 
     /// The down of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn down(&self, ldd: &Ldd) -> Ldd
     {
-        self.verify_ldd(ldd);
+        self.verify_ldd(&ldd.borrow());
         let node = &self.table[ldd.index()];
         Ldd::new(&self.protection_set, node.down)
     }
@@ -281,7 +287,7 @@ impl Storage
     /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn right(&self, ldd: &Ldd) -> Ldd
     {
-        self.verify_ldd(ldd);
+        self.verify_ldd(&ldd.borrow());
         let node = &self.table[ldd.index()];
         Ldd::new(&self.protection_set, node.right)
     }
@@ -289,13 +295,25 @@ impl Storage
     /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn get(&self, ldd: &Ldd) -> Data
     {
-        self.verify_ldd(ldd);     
+        let ldd = ldd.borrow();
+
+        self.verify_ldd(&ldd);     
         let node = &self.table[ldd.index()];
         Data(node.value, Ldd::new(&self.protection_set, node.down), Ldd::new(&self.protection_set, node.right))
     }
 
+    /// Returns a DataRef tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
+    pub fn get_ref<'a, T: LddArg<'a>>(&self, ldd: &'a T) -> DataRef<'a>
+    {
+        let ldd = ldd.borrow();
+
+        self.verify_ldd(&ldd);     
+        let node = &self.table[ldd.index()];
+        DataRef(node.value, LddRef::new(node.down), LddRef::new(node.right))
+    }
+
     // Asserts whether the given ldd is valid.
-    fn verify_ldd(&self, ldd: &Ldd)
+    fn verify_ldd(&self, ldd: &LddRef)
     {    
         debug_assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
         debug_assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  

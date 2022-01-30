@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use rustc_hash::FxHashMap;
 
-use crate::{Storage, Ldd};
+use crate::{Storage, Ldd, LddRef};
 
 use super::ldd::ProtectionSet;
 
@@ -119,8 +119,8 @@ pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a
 }
 
 /// Implements an operation cache for a binary LDD operator.
-pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: &Ldd, b: &Ldd, f: F) -> Ldd
-    where F: Fn(&mut Storage, &Ldd, &Ldd) -> Ldd
+pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: LddRef, b: LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, LddRef, LddRef) -> Ldd
 {
     let key = (a.index(), b.index());
     if let Some(result) = storage.operation_cache().get_cache2(&operator).get(&key) 
@@ -138,8 +138,8 @@ pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: &L
 
 /// Implements an operation cache for a commutative binary LDD operator, i.e.,
 /// an operator f such that f(a,b) = f(b,a) for all LDD a and b.
-pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: &Ldd, b: &Ldd, f: F) -> Ldd
-    where F: Fn(&mut Storage, &Ldd, &Ldd) -> Ldd
+pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: LddRef, b: LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, LddRef, LddRef) -> Ldd
 {
     // Reorder the inputs to improve caching behaviour (can potentially half the cache size)
     if a.index() < b.index() {
