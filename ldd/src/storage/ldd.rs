@@ -27,6 +27,7 @@ impl Ldd
         self.index
     }
 
+    /// Returns an [LddRef] with the same lifetime as this Ldd instance.
     pub fn borrow(&self) -> LddRef
     {
         LddRef::new(self.index)
@@ -75,14 +76,6 @@ impl Hash for Ldd
 
 impl Eq for Ldd {}
 
-impl<'a> LddArg<'a> for Ldd
-{
-    fn borrow(&'a self) -> LddRef<'a>
-    {
-        self.borrow()   
-    }
-}
-
 /// The LddRef is a reference to an existing [Ldd] instance. This can be used to
 /// avoid explicit protections that are performed when creating an [Ldd] instance.
 #[derive(Hash, PartialEq, Eq, Debug)]
@@ -104,6 +97,12 @@ impl<'a> LddRef<'a>
     {
         self.index
     }
+    
+    /// Returns an LddRef with the same lifetime as itself.
+    pub fn borrow(&self) -> LddRef
+    {
+        LddRef::new(self.index())        
+    }
 }
 
 impl PartialEq<Ldd> for LddRef<'_>
@@ -112,20 +111,6 @@ impl PartialEq<Ldd> for LddRef<'_>
     { 
         self.index == other.index()
     }
-}
-
-impl LddArg<'_> for LddRef<'_>
-{
-    fn borrow(&self) -> LddRef
-    {
-        LddRef::new(self.index())        
-    }
-}
-
-/// This is a trait for functions that accept both [Ldd] and [LddRef] instances.
-pub trait LddArg<'a>
-{
-    fn borrow(&'a self) -> LddRef<'a>;
 }
 
 /// The protection set keeps track of LDD nodes that should not be garbage
