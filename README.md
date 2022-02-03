@@ -21,12 +21,12 @@ The `reach` tool can be compared to the `lddmc` tool provided in [Sylvan](https:
 | anderson.4.ldd        |    0.19          |  0.79             |    0.14       |
 | anderson.6.ldd        |    6.40          |  6.00             |    9.88       |
 | anderson.8.ldd        |   52.06          | 33.20             |   83.86       |
-| bakery.4.ldd          |    0.42          |                   |    0.61       |
-| bakery.5.ldd          |   12.04          |                   |   21.56       |
-| bakery.6.ldd          |   11.95          |                   |   17.29       |
-| bakery.7.ldd          |   45.46          |                   |   91.05       |
-| blocks.2.ldd          |    0.18          |                   |    n/a*       |
-| blocks.3.ldd          |    3.46          |                   |    n/a*       |
+| bakery.4.ldd          |    0.42          |  1.62             |    0.61       |
+| bakery.5.ldd          |   12.04          |  9.87             |   21.56       |
+| bakery.6.ldd          |   11.95          |  9.37             |   17.29       |
+| bakery.7.ldd          |   45.46          | 28.54             |   91.05       |
+| blocks.2.ldd          |    0.18          |  0.84             |    n/a*       |
+| blocks.3.ldd          |    3.46          |  7.20             |    n/a*       |
 | blocks.4.ldd          |  327.03          |                   |    n/a*       |
 | collision.4.ldd       |   54.25          |                   |  140.78       |
 | collision.5.ldd       |  322.08          |                   | 1048.82       |
