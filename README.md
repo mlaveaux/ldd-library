@@ -16,27 +16,28 @@ For micro benchmarks we use [Criterion.rs](https://crates.io/crates/criterion) a
 
 The `reach` tool can be compared to the `lddmc` tool provided in [Sylvan](https://github.com/trolando/sylvan) to benchmark actual graph exploration on the models provided in `examples/reach/models`. For this the tool is build in release configuration using `cargo build --release`. We pass the options `-sbfs -w1` to `lddmc` to disable multi-threading and use the same exploration strategy for equal comparison. We use `hyperfine` for the benchmarking process, which can be installed with `cargo install hyperfine`. The benchmarks are the averages of at least ten runs obtained using `hyperfine --warmup 3 <command>`. These benchmarks have been performed on a machine with an Intel(R) Core(TM) i7-7700HQ CPU with 32GB ram.
 
-| Model                 | lddmc (1 worker) | lddmc (8 workers) | reach         |
-| ---                   | ---:             | ---:              | ---:          |
-| anderson.4.ldd        |    0.19          |  0.79             |    0.14       |
-| anderson.6.ldd        |    6.40          |  6.00             |    9.88       |
-| anderson.8.ldd        |   52.06          | 33.20             |   83.86       |
-| bakery.4.ldd          |    0.42          |  1.62             |    0.61       |
-| bakery.5.ldd          |   12.04          |  9.87             |   21.56       |
-| bakery.6.ldd          |   11.95          |  9.37             |   17.29       |
-| bakery.7.ldd          |   45.46          | 28.54             |   91.05       |
-| blocks.2.ldd          |    0.18          |  0.84             |    n/a*       |
-| blocks.3.ldd          |    3.46          |  7.20             |    n/a*       |
-| blocks.4.ldd          |  327.03          |                   |    n/a*       |
-| collision.4.ldd       |   54.25          |                   |  140.78       |
-| collision.5.ldd       |  322.08          |                   | 1048.82       |
-| collision.6.ldd       | 4930.45          |                   |   OOM**       |
-| lifts.6.ldd           |    2.49          |                   |    7.65       |
-| lifts.7.ldd           |   20.03          |                   |   46.70       |
-| schedule_world.2.ldd  |    1.80          |                   |    3.92       |
-| schedule_world.2.ldd  |   63.91          |                   |  175.95       |
+| Model                 | lddmc (1 worker) | lddmc (8 workers) | reach (2cd4a51) | reach (f18cb62) |
+| ---                   | ---:             | ---:              | ---:            |  ---:
+| anderson.4.ldd        |    0.19          |  0.79             |    0.14         |   0.10
+| anderson.6.ldd        |    6.40          |  6.00             |    9.88         |   6.77
+| anderson.8.ldd        |   52.06          | 33.20             |   83.86         |  61.13
+| bakery.4.ldd          |    0.42          |  1.62             |    0.61         |   0.44
+| bakery.5.ldd          |   12.04          |  9.87             |   21.56         |  15.27
+| bakery.6.ldd          |   11.95          |  9.37             |   17.29         |  12.51
+| bakery.7.ldd          |   45.46          | 28.54             |   91.05         |  66.10
+| blocks.2.ldd          |    0.18          |  0.84             |    n/a*         |   n/a*
+| blocks.3.ldd          |    3.46          |  7.20             |    n/a*         |   n/a*
+| blocks.4.ldd          |  327.03          |                   |    n/a*         |   n/a*
+| collision.4.ldd       |   54.25          | 38.65             |  140.78         | 102.74
+| collision.5.ldd       |  322.08          |                   | 1048.82         |
+| collision.6.ldd       | 4930.45          |                   |   OOM**         |
+| lifts.6.ldd           |    2.49          |  4.52             |    7.65         |   5.00
+| lifts.7.ldd           |   20.03          | 20.11             |   46.70         |  31.23
+| schedule_world.2.ldd  |    1.80          |  2.09             |    3.92         |   2.97
+| schedule_world.2.ldd  |   63.91          | 36.29             |  175.95         | 138.47
 
-\* For these benchmarks the `reach` tool indicates that the LDD was not valid; so that is most likely a bug. \*\* This benchmark requires a lot of memory and the ldd-library used 32 bytes per LDD node as opposed to 16 bytes in Sylvan. This has since been improved to 24 bytes per LDD node for the ldd-library.
+\* For these benchmarks the `reach` tool indicates that the LDD was not valid; so that is most likely a bug. 
+\*\* This benchmark requires a lot of memory and the ldd-library used 32 bytes per LDD node as opposed to 16 bytes in Sylvan. This has since been improved to 24 bytes per LDD node for the ldd-library.
 
 # Profiling
 

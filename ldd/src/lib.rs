@@ -28,6 +28,9 @@
 //! \[Dijk18\] --- Tom van Dijk, Jaco van de Pol. Sylvan: multi-core framework
 //! for decision diagrams. International Journal on Software Tools for
 //! Technology Transfer. 19(6):675-696, 2017.
+//! 
+#[macro_use]
+extern crate static_assertions;
 
 mod storage;
 mod operations;

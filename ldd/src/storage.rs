@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use rustc_hash::FxHashMap;
@@ -25,6 +24,8 @@ pub struct Node
     marked: bool,
     filled: bool, // Indicates whether this position in the table represents a valid node.
 }
+
+static_assertions::assert_eq_size!(Node, (usize, usize, usize));
 
 impl Node
 {
@@ -99,7 +100,7 @@ impl Storage
         let shared = Rc::new(RefCell::new(ProtectionSet::new()));
 
         Self { 
-            index: HashMap::default(),
+            index: FxHashMap::default(),
             protection_set: shared.clone(),
             table:  vec![
                 // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
