@@ -192,6 +192,8 @@ impl Storage
     /// Cleans up all LDDs that are unreachable from the root LDDs.
     pub fn garbage_collect(&mut self)
     {
+        // Clear the cache since it contains unprotected LDDs, and keep track of size before clearing.
+        let size_of_cache = self.cache.len();
         self.cache.clear();
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
@@ -240,7 +242,8 @@ impl Storage
         }
 
         if self.enable_performance_metrics {
-            println!("Collected {} elements", number_of_collections);
+            println!("Collected {number_of_collections} elements and {} elements remaining", self.table.len());
+            println!("Operation cache contains {size_of_cache} elements");
         }
     }
     

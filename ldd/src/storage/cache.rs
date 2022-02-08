@@ -71,6 +71,26 @@ impl OperationCache
         }    
     }
 
+    /// Returns the total amount of elements in the caches.
+    pub fn len(&self) -> usize
+    {
+        let mut result: usize = 0;
+        
+        for cache in self.caches1.iter() {
+            result += cache.len();
+        }
+
+        for cache in self.caches2.iter() {
+            result += cache.len();
+        }
+
+        for cache in self.caches3.iter() {
+            result += cache.len();
+        }   
+
+        result
+    }
+
     fn get_cache1(&mut self, operator: &UnaryFunction) -> &mut FxHashMap<usize, usize>
     {
         match operator {
