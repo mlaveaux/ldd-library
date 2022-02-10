@@ -195,6 +195,7 @@ impl Storage
         // Clear the cache since it contains unprotected LDDs, and keep track of size before clearing.
         let size_of_cache = self.cache.len();
         self.cache.clear();
+        self.cache.limit(self.table.len());
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
         let mut stack: Vec<usize> = Vec::new();
