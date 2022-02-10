@@ -72,6 +72,12 @@ impl OperationCache
         result
     }
 
+    /// Returns true iff the operation cache is empty.
+    pub fn is_empty(&self) -> bool
+    {
+        self.len() == 0
+    }
+
     /// Puts a limit on the operation cache size. This will ensure that
     /// self.len() <= n if self.limit(n) has been set.
     pub fn limit(&mut self, size: usize)
@@ -118,10 +124,13 @@ impl OperationCache
     }
 }
 
+/// Implements an associative mapping between key value pairs, but has a limit
+/// on the maximum amount of elements stored. The cache requires that default
+/// values of K are never used in calls to get and insert, because these are
+/// used to indicate empty cache entries.
 pub struct Cache<K, V, S = RandomState>
 {
-    table: Vec<Option<(K, V)>>,
-    number_of_elements: usize,
+    table: Vec<(K, V)>,
     hash_builder: S,
 }
 
@@ -130,13 +139,19 @@ impl<K: Default + Clone, V: Clone + Default> Cache<K, V, RandomState>
     pub fn new() -> Cache<K, V, RandomState>
     {
         Cache {
-            table: vec![None; 1024],
+            table: vec![Default::default(); 1024],
             hash_builder: RandomState::default(),
-            number_of_elements: 0,
         }
     }
 }
 
+impl<K: Default + Clone, V: Clone + Default> Default for Cache<K, V, RandomState> 
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+    
 impl<K: Default + Clone, V: Clone + Default, S> Cache<K, V, S>
 {
     /// Removes all elements stored in the cache.
@@ -145,8 +160,7 @@ impl<K: Default + Clone, V: Clone + Default, S> Cache<K, V, S>
         let capacity = self.table.len();
 
         self.table.clear();
-        self.table.resize(capacity, Default::default());    
-        self.number_of_elements = 0;    
+        self.table.resize(capacity, Default::default());
     }
 
     /// Puts a limit on the maximum self.len() of this cache.
@@ -161,56 +175,49 @@ impl<K: Default + Clone, V: Clone + Default, S> Cache<K, V, S>
     /// Returns the amount of elements in the cache.
     pub fn len(&self) -> usize
     {
-        self.number_of_elements
+        self.table.len()
+    }
+
+    /// Returns true iff the cache is empty.
+    pub fn is_empty(&self) -> bool
+    {
+        self.len() == 0
     }
 }
 
-
-impl<K: Hash + Eq, V, S: BuildHasher> Cache<K, V, S>
+impl<K: Default + Eq + Hash, V, S: BuildHasher> Cache<K, V, S>
 {
+    /// Check whether key is in the storage, if so returns Some(value) and None otherwise.
     pub fn get(&mut self, key: &K) -> Option<&V>
     {
+        debug_assert!(*key != K::default(), "The key may never be equal to its default value.");
+
         // Compute the index in the table.
         let mut hasher = self.hash_builder.build_hasher();
         key.hash(&mut hasher);
         let index = hasher.finish() % (self.table.len() as u64);
 
         let entry = &self.table[index as usize];
-
-        if let Some(x) = entry
+        if entry.0 == *key 
         {
-            if x.0 == *key 
-            {
-                Some(&x.1)
-            }
-            else 
-            {
-                None
-            }
+            Some(&entry.1)
         }
-        else
+        else 
         {
             None
         }
     }
 
+    /// Inserts the given key value pair into the cache. Might evict other pairs in the cache.
     pub fn insert(&mut self, key: K, value: V)
     {
+        debug_assert!(key != K::default(), "The key may never be equal to its default value.");
+
         // Compute the index in the table.
         let mut hasher = self.hash_builder.build_hasher();
         key.hash(&mut hasher);
         let index = hasher.finish() % (self.table.len() as u64);
-        let entry = &mut self.table[index as usize];
-        
-        if let Some(x) = entry
-        {
-            *x = (key, value);
-        } 
-        else 
-        {
-            *entry = Some((key, value));
-            self.number_of_elements += 1;
-        }
+        self.table[index as usize] = (key, value);
     }
 }
 
@@ -221,7 +228,6 @@ impl<K: Clone, V: Clone, S: Clone> Clone for Cache<K, V, S>
         Cache { 
             table: self.table.clone(), 
             hash_builder: self.hash_builder.clone(),
-            number_of_elements: self.number_of_elements,
         }
     }
 }

@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-/// Every Ldd points to its root node in the [Storage] instance for maximal
+/// Every Ldd points to its root node in the Storage instance for maximal
 /// sharing. These Ldd instances can only be created from the storage.
 pub struct Ldd
 {
@@ -87,7 +87,7 @@ pub struct LddRef<'a>
 
 impl<'a> LddRef<'a>
 {
-    /// TODO: This function should only be called by [Storage] and [Ldd]
+    /// TODO: This function should only be called by Storage and [Ldd]
     pub fn new(index: usize) -> LddRef<'a>
     {
         LddRef { index, marker: PhantomData }
