@@ -14,8 +14,7 @@ fi
 
 if ! command -v "lddmc" &> /dev/null
 then
-    echo "WARNING: To run the lddmc benchmarks ensure that it can be found in path."
-    exit
+    echo "WARNING: To run the lddmc benchmarks ensure that it can be found in path, otherwise will be skipped."
 fi
 
 # Perform the benchmarks for reach.
@@ -25,13 +24,16 @@ do
   BENCHMARKS+=("reach $file")
 done
 
-hyperfine --warmup 3 -i "${BENCHMARKS[@]/#}"
+hyperfine --warmup 3 -i -u second --export-markdown results_reach.md "${BENCHMARKS[@]/#}"
 
-# Perform the benchmarks for lddmc
-BENCHMARKS=()
-for file in *.ldd
-do
-  BENCHMARKS+=("lddmc -w1 -sbfs $file")
-done
+if command -v "lddmc" &> /dev/null
+then
+  # Perform the benchmarks for lddmc
+  BENCHMARKS=()
+  for file in *.ldd
+  do
+    BENCHMARKS+=("lddmc -w1 -sbfs $file")
+  done
 
-hyperfine --warmup 3 -i "${BENCHMARKS[@]/#}"
+  hyperfine --warmup 3 -i -u second --export-markdown results_lddmc.md "${BENCHMARKS[@]/#}"
+fi
