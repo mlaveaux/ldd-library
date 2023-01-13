@@ -215,7 +215,7 @@ impl Storage
             }
             else
             {
-                self.index.remove(node); // First rmove the node as mutating it changes the hash.
+                self.index.remove(node); // First remove the node as mutating it changes the hash.
                                 
                 match self.free {
                     Some(next) => {
@@ -335,7 +335,7 @@ impl Drop for Storage
 /// Mark all LDDs reachable from the given root index.
 /// 
 /// Reuses the stack for the depth-first exploration.
-fn mark_node(table: &mut Vec<Node>, stack: &mut Vec<usize>, root: usize)
+fn mark_node(table: &mut [Node], stack: &mut Vec<usize>, root: usize)
 {
     stack.push(root);
     while let Some(current) = stack.pop()

@@ -284,9 +284,6 @@ pub fn relational_product(storage: &mut Storage, set: LddRef, rel: LddRef, meta:
 /// Returns the largest subset of 'a' that does not contains elements of 'b', i.e., set difference.
 pub fn minus(storage: &mut Storage, a: LddRef, b: LddRef) -> Ldd
 {
-    let a = a.borrow();
-    let b = b.borrow();
-
     if a == b || a == *storage.empty_set() {
         storage.empty_set().clone()
     } else if b == *storage.empty_set() {
@@ -357,6 +354,24 @@ pub fn union(storage: &mut Storage, a: LddRef, b: LddRef) -> Ldd
                 }
             }
         )        
+    }
+}
+
+/// Appends the given value to every vector in the set represented by the given ldd.
+pub fn append(storage: &mut Storage, ldd: LddRef, value: Value) -> Ldd
+{
+    if ldd == *storage.empty_set() {
+        storage.empty_set().clone()
+    } else if ldd == *storage.empty_vector() {
+        singleton(storage, &[value])
+    } else {
+        // Traverse the ldd.
+        let DataRef(val, down, right) = storage.get_ref(ldd.borrow());
+
+        let down_result = append(storage, down.borrow(), value);
+        let right_result = append(storage, right.borrow(), value);
+
+        storage.insert(val, down_result.borrow(), right_result.borrow())
     }
 }
 
@@ -709,5 +724,29 @@ mod tests
         }
         let expected = from_iter(&mut storage, expected_result.iter());
         assert_eq!(result, expected, "projected result does not match vector projection.");
+    }
+
+    // Test the append function with random inputs.
+    #[test]
+    fn random_append()
+    {
+        let mut storage = Storage::new();
+        
+        let set = random_vector_set(32, 10, 10);
+        let ldd = from_iter(&mut storage, set.iter());
+        let result = append(&mut storage, ldd.borrow(), 0);
+
+        let mut expected_result: HashSet<Vec<Value>> = HashSet::new();
+        for element in &set
+        {
+            let mut appended = element.to_vec();
+            appended.push(0 as Value);
+            expected_result.insert(appended);
+        }
+        let expected = from_iter(&mut storage, expected_result.iter());
+
+        print_differences(&storage, &result, &expected);
+        assert_eq!(result, expected, "appended result does not match vector append");
+
     }
 }
