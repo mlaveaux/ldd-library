@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::hash::{Hash, Hasher};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHasher};
 
 use crate::operations::height;
 
@@ -20,18 +20,28 @@ pub struct Node
     value: Value,
     down: usize,
     right: usize, // If !filled then right is the next freelist element.
+    hash: usize,
 
     marked: bool,
     filled: bool, // Indicates whether this position in the table represents a valid node.
 }
 
-static_assertions::assert_eq_size!(Node, (usize, usize, usize));
+static_assertions::assert_eq_size!(Node, (usize, usize, usize, usize));
+
+
+fn calculate_hash(value: Value, down: usize, right: usize, table: &Vec<Node>) -> usize {
+    let mut s = FxHasher::default();
+    value.hash(&mut s);
+    s.write_usize(table[down].hash);
+    s.write_usize(table[right].hash);
+    s.finish() as usize
+}
 
 impl Node
 {
-    fn new(value: Value, down: usize, right: usize) -> Node
+    fn new(value: Value, down: usize, right: usize, hash: usize) -> Node
     {
-        Node {value, down, right, marked: false, filled: true}
+        Node {value, down, right, marked: false, filled: true, hash}
     }
     
     /// Returns false if the node has been garbage collected.
@@ -82,6 +92,7 @@ impl Default for Storage {
     }
 }   
 
+
 impl Storage
 {
     pub fn new() -> Self
@@ -89,8 +100,8 @@ impl Storage
         let shared = Rc::new(RefCell::new(ProtectionSet::new()));
         let table=  Rc::new(RefCell::new(vec![
             // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
-            Node::new(0, 0, 0),
-            Node::new(0, 0, 0),
+            Node::new(0, 0, 0, 0),
+            Node::new(0, 0, 0, 1),
             ]));
 
         Self { 
@@ -137,8 +148,9 @@ impl Storage
             }
             self.count_until_collection = self.table.borrow().len() as u64;
         }
-        
-        let node = Node::new(value, down.index(), right.index());
+
+        let hash = calculate_hash(value, down.index(), right.index(), &self.table.borrow());        
+        let node = Node::new(value, down.index(), right.index(),hash );
         let index = match self.free {
             Some(first) =>
             {

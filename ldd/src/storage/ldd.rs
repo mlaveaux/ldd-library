@@ -74,17 +74,7 @@ pub fn equals(left: usize, right: usize, table: &Vec<Node>) -> bool
 pub fn hash<H: Hasher>(state: &mut H, index: usize, table: &Vec<Node>)
 {
     let node = &table[index];
-
-    if index == 0 || index == 1
-    {        
-        node.value.hash(state);
-    }
-    else
-    {
-        node.value.hash(state);
-        hash(state, node.down, table);
-        hash(state, node.right, table);
-    }
+    state.write_usize(node.hash);
 }
 
 
