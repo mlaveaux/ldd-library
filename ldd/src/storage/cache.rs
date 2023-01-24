@@ -2,9 +2,48 @@ use std::{cell::RefCell, rc::Rc, hash::{Hasher, BuildHasher}};
 use core::hash::Hash;
 use ahash::RandomState;
 
-use crate::{Storage, Ldd, LddRef};
+use crate::{Storage, Ldd, LddRef, Node};
 
 use super::ldd::ProtectionSet;
+use super::ldd::{equals, hash};
+
+#[derive(Default, Clone, Eq)]
+struct CacheEntry
+{    
+    index: usize, // Reference in the node table.
+    table: Rc<RefCell<Vec<Node>>>,
+}
+
+impl CacheEntry
+{
+    pub fn new(index: usize, table: &Rc<RefCell<Vec<Node>>>) -> CacheEntry
+    {
+        CacheEntry { table: Rc::clone(table), index }
+    }
+}
+
+impl PartialEq for CacheEntry
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        equals(self.index, other.index, &self.table.borrow()) 
+    }
+}
+
+impl PartialEq<usize> for CacheEntry
+{
+    fn eq(&self, other: &usize) -> bool
+    {
+        equals(self.index, *other, &self.table.borrow()) 
+    }
+}
+
+impl Hash for CacheEntry
+{    
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        hash(state, self.index, &self.table.borrow())
+    }
+}
 
 /// The operation cache can significantly speed up operations by caching
 /// intermediate results. This is necessary since the maximal sharing means that
@@ -17,17 +56,19 @@ use super::ldd::ProtectionSet;
 pub struct OperationCache
 {
     protection_set: Rc<RefCell<ProtectionSet>>,
-    caches1: Vec<Cache<usize, usize>>,
-    caches2: Vec<Cache<(usize, usize), usize>>,
-    caches3: Vec<Cache<(usize, usize, usize), usize>>,
+    table: Rc<RefCell<Vec<Node>>>,
+    caches1: Vec<Cache<CacheEntry, usize>>,
+    caches2: Vec<Cache<(CacheEntry, CacheEntry), usize>>,
+    caches3: Vec<Cache<(CacheEntry, CacheEntry, CacheEntry), usize>>,
 }
 
 impl OperationCache
 {
-    pub fn new(protection_set: Rc<RefCell<ProtectionSet>>) -> OperationCache
+    pub fn new(protection_set: Rc<RefCell<ProtectionSet>>, table: Rc<RefCell<Vec<Node>>>) -> OperationCache
     {
         OperationCache {
             protection_set,
+            table,
             caches1: vec![Cache::new()],
             caches2: vec![Cache::new(); 2],
             caches3: vec![Cache::new()],
@@ -95,14 +136,14 @@ impl OperationCache
         }   
     }
 
-    fn get_cache1(&mut self, operator: &UnaryFunction) -> &mut Cache<usize, usize>
+    fn get_cache1(&mut self, operator: &UnaryFunction) -> &mut Cache<CacheEntry, usize>
     {
         match operator {
             UnaryFunction::Len => &mut self.caches1[0],
         }
     }
 
-    fn get_cache2(&mut self, operator: &BinaryOperator) -> &mut Cache<(usize, usize), usize>
+    fn get_cache2(&mut self, operator: &BinaryOperator) -> &mut Cache<(CacheEntry, CacheEntry), usize>
     {
         match operator {
             BinaryOperator::Union => &mut self.caches2[0],
@@ -110,7 +151,7 @@ impl OperationCache
         }
     }
 
-    fn get_cache3(&mut self, operator: &TernaryOperator) -> &mut Cache<(usize, usize, usize), usize>
+    fn get_cache3(&mut self, operator: &TernaryOperator) -> &mut Cache<(CacheEntry, CacheEntry, CacheEntry), usize>
     {
         match operator {
             TernaryOperator::RelationalProduct => &mut self.caches3[0],
@@ -120,7 +161,7 @@ impl OperationCache
     /// Create an Ldd from the given index. Only safe because this is a private function.
     fn create(&mut self, index: usize) -> Ldd
     {
-        Ldd::new(&self.protection_set, index)
+        Ldd::new(&self.protection_set, &self.table, index)
     }
 }
 
@@ -255,7 +296,7 @@ pub enum TernaryOperator
 pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a: LddRef, f: F) -> usize
     where F: Fn(&mut Storage, LddRef) -> usize
 {
-    let key = a.index();
+    let key = CacheEntry::new(a.index(), &storage.operation_cache().table);
     if let Some(result) = storage.operation_cache().get_cache1(&operator).get(&key) 
     {
         *result
@@ -272,7 +313,7 @@ pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a
 pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: LddRef, b: LddRef, f: F) -> Ldd
     where F: Fn(&mut Storage, LddRef, LddRef) -> Ldd
 {
-    let key = (a.index(), b.index());
+    let key = ( CacheEntry::new(a.index(), &storage.operation_cache().table),  CacheEntry::new(b.index(), &storage.operation_cache().table));
     if let Some(result) = storage.operation_cache().get_cache2(&operator).get(&key) 
     {
         let result = *result; // Necessary to decouple borrow from storage and the call to create.
@@ -303,7 +344,7 @@ pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, 
 pub fn cache_terniary_op<F>(storage: &mut Storage, operator: TernaryOperator, a: LddRef, b: LddRef, c: LddRef, f: F) -> Ldd
     where F: Fn(&mut Storage, LddRef, LddRef, LddRef) -> Ldd
 {
-    let key = (a.index(), b.index(), c.index());
+    let key = ( CacheEntry::new(a.index(), &storage.operation_cache().table),  CacheEntry::new(b.index(), &storage.operation_cache().table),  CacheEntry::new(c.index(), &storage.operation_cache().table));
     if let Some(result) = storage.operation_cache().get_cache3(&operator).get(&key) 
     {
         let result = *result; // Necessary to decouple borrow from storage and the call to create.

@@ -51,16 +51,6 @@ impl PartialEq for Node
 
 impl Eq for Node {}
 
-impl Hash for Node
-{    
-    fn hash<H: Hasher>(&self, state: &mut H) 
-    {
-        self.value.hash(state);
-        self.down.hash(state);
-        self.right.hash(state);
-    }
-}
-
 /// This is the user facing data of a [Node].
 pub struct Data(pub Value, pub Ldd, pub Ldd);
 
@@ -74,8 +64,7 @@ pub struct DataRef<'a>(pub Value, pub LddRef<'a>, pub LddRef<'a>);
 pub struct Storage
 {
     protection_set: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.
-    table: Vec<Node>,
-    index: FxHashMap<Node, usize>,
+    table: Rc<RefCell<Vec<Node>>>,
     cache: OperationCache,
 
     free: Option<usize>, // A list of free nodes.
@@ -98,23 +87,23 @@ impl Storage
     pub fn new() -> Self
     {
         let shared = Rc::new(RefCell::new(ProtectionSet::new()));
+        let table=  Rc::new(RefCell::new(vec![
+            // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
+            Node::new(0, 0, 0),
+            Node::new(0, 0, 0),
+            ]));
 
         Self { 
-            index: FxHashMap::default(),
             protection_set: shared.clone(),
-            table:  vec![
-                // Add two nodes representing 'false' and 'true' respectively; these cannot be created using insert.
-                Node::new(0, 0, 0),
-                Node::new(0, 0, 0),
-                ],
-            cache: OperationCache::new(Rc::clone(&shared)),
+            table: table.clone(),
+            cache: OperationCache::new(Rc::clone(&shared), Rc::clone(&table)),
 
             count_until_collection: 10000,
             free: None,
             enable_garbage_collection: true,
             enable_performance_metrics: false,
-            empty_set: Ldd::new(&shared, 0),
-            empty_vector: Ldd::new(&shared, 1),
+            empty_set: Ldd::new(&shared, &table, 0),
+            empty_vector: Ldd::new(&shared, &table, 1),
         }
     }
 
@@ -130,8 +119,8 @@ impl Storage
         // These invariants ensure that the result is a valid LDD.
         debug_assert_ne!(down, *self.empty_set(), "down node can never be the empty set.");
         debug_assert_ne!(right, *self.empty_vector(), "right node can never be the empty vector."); 
-        debug_assert!(down.index() < self.table.len(), "down node not in table.");
-        debug_assert!(right.index() < self.table.len(), "right not not in table.");
+        debug_assert!(down.index() < self.table.borrow().len(), "down node not in table.");
+        debug_assert!(right.index() < self.table.borrow().len(), "right not not in table.");
 
         if right != *self.empty_set()
         {
@@ -146,47 +135,41 @@ impl Storage
             {
                 self.garbage_collect();
             }
-            self.count_until_collection = self.table.len() as u64;
+            self.count_until_collection = self.table.borrow().len() as u64;
         }
         
-        let new_node = Node::new(value, down.index(), right.index());
-        let index = *self.index.entry(new_node).or_insert_with(
-            || 
+        let node = Node::new(value, down.index(), right.index());
+        let index = match self.free {
+            Some(first) =>
             {
-                let node = Node::new(value, down.index(), right.index());
-
-                match self.free {
-                    Some(first) =>
-                    {
-                        let next = self.table[first].right;
-                        if first == next {
-                            // The list is now empty as its first element points to itself.
-                            self.free = None;
-                        } else {
-                            // Update free to be the next element in the list.
-                            self.free = Some(next);
-                        }
-        
-                        self.table[first] = node;
-                        first
-                    }
-                    None =>
-                    {
-                        // No free positions so insert new.
-                        self.count_until_collection -= 1;
-                        self.table.push(node);
-                        self.table.len() - 1
-                    }
+                let next = self.table.borrow_mut()[first].right;
+                if first == next {
+                    // The list is now empty as its first element points to itself.
+                    self.free = None;
+                } else {
+                    // Update free to be the next element in the list.
+                    self.free = Some(next);
                 }
-            });
-        
-        Ldd::new(&self.protection_set, index)
+
+                self.table.borrow_mut()[first] = node;
+                first
+            }
+            None =>
+            {
+                // No free positions so insert new.
+                self.count_until_collection -= 1;
+                self.table.borrow_mut().push(node);
+                self.table.borrow().len() - 1
+            }
+        };
+
+        Ldd::new(&self.protection_set, &self.table, index)
     }
 
     /// Upgrade an [LddRef] to a protected [Ldd] instance.
     pub fn protect(&mut self, ldd: LddRef) -> Ldd
     {
-        Ldd::new(&self.protection_set, ldd.index())
+        Ldd::new(&self.protection_set, &self.table, ldd.index())
     }
 
     /// Cleans up all LDDs that are unreachable from the root LDDs.
@@ -195,18 +178,18 @@ impl Storage
         // Clear the cache since it contains unprotected LDDs, and keep track of size before clearing.
         let size_of_cache = self.cache.len();
         self.cache.clear();
-        self.cache.limit(self.table.len());
+        self.cache.limit(self.table.borrow().len());
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
         let mut stack: Vec<usize> = Vec::new();
         for root in self.protection_set.borrow().iter()
         {
-            mark_node(&mut self.table, &mut stack, root);
+            mark_node(&mut self.table.borrow_mut(), &mut stack, root);
         }
         
         // Collect all garbage.
         let mut number_of_collections: usize = 0;
-        for (index, node) in self.table.iter_mut().enumerate()
+        for (index, node) in self.table.borrow_mut().iter_mut().enumerate()
         {
             if node.marked
             {
@@ -214,9 +197,7 @@ impl Storage
                 node.marked = false
             }
             else
-            {
-                self.index.remove(node); // First remove the node as mutating it changes the hash.
-                                
+            {                                
                 match self.free {
                     Some(next) => {
                         node.right = next;
@@ -233,17 +214,17 @@ impl Storage
         }
 
         // Check whether the direct children of a valid node are valid (this implies that the whole tree is valid if the root is valid).
-        for node in self.table.iter()
+        for node in self.table.borrow().iter()
         {
             if node.is_valid()
             {
-                debug_assert!(self.table[node.down].is_valid(), "The down node of a valid node must be valid.");
-                debug_assert!(self.table[node.right].is_valid(), "The right node of a valid node must be valid.");
+                debug_assert!(self.table.borrow()[node.down].is_valid(), "The down node of a valid node must be valid.");
+                debug_assert!(self.table.borrow()[node.right].is_valid(), "The right node of a valid node must be valid.");
             }
         }
 
         if self.enable_performance_metrics {
-            println!("Collected {number_of_collections} elements and {} elements remaining", self.table.len());
+            println!("Collected {number_of_collections} elements and {} elements remaining", self.table.borrow().len());
             println!("Operation cache contains {size_of_cache} elements");
         }
     }
@@ -275,7 +256,7 @@ impl Storage
     pub fn value(&self, ldd: LddRef) -> Value
     {
         self.verify_ldd(ldd.borrow());
-        let node = &self.table[ldd.index()];
+        let node = &self.table.borrow()[ldd.index()];
         node.value
     }
 
@@ -283,31 +264,31 @@ impl Storage
     pub fn down(&self, ldd: LddRef) -> Ldd
     {
         self.verify_ldd(ldd.borrow());
-        let node = &self.table[ldd.index()];
-        Ldd::new(&self.protection_set, node.down)
+        let node = &self.table.borrow()[ldd.index()];
+        Ldd::new(&self.protection_set, &self.table, node.down)
     }
 
     /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn right(&self, ldd: LddRef) -> Ldd
     {
         self.verify_ldd(ldd.borrow());
-        let node = &self.table[ldd.index()];
-        Ldd::new(&self.protection_set, node.right)
+        let node = &self.table.borrow()[ldd.index()];
+        Ldd::new(&self.protection_set, &self.table, node.right)
     }
 
     /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn get(&self, ldd: LddRef) -> Data
     {
         self.verify_ldd(ldd.borrow());     
-        let node = &self.table[ldd.index()];
-        Data(node.value, Ldd::new(&self.protection_set, node.down), Ldd::new(&self.protection_set, node.right))
+        let node = &self.table.borrow()[ldd.index()];
+        Data(node.value, Ldd::new(&self.protection_set, &self.table, node.down), Ldd::new(&self.protection_set, &self.table, node.right))
     }
 
     /// Returns a DataRef tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
     pub fn get_ref<'a>(&self, ldd: LddRef<'a>) -> DataRef<'a>
     {
         self.verify_ldd(ldd.borrow());     
-        let node = &self.table[ldd.index()];
+        let node = &self.table.borrow()[ldd.index()];
         DataRef(node.value, LddRef::new(node.down), LddRef::new(node.right))
     }
 
@@ -316,7 +297,7 @@ impl Storage
     {    
         debug_assert_ne!(&ldd, self.empty_set(), "Cannot inspect empty set.");
         debug_assert_ne!(&ldd, self.empty_vector(), "Cannot inspect empty vector.");  
-        debug_assert!(self.table[ldd.index()].is_valid(), "Node {} should not have been garbage collected", ldd.index());
+        debug_assert!(self.table.borrow()[ldd.index()].is_valid(), "Node {} should not have been garbage collected", ldd.index());
     }
 }
 
@@ -327,7 +308,7 @@ impl Drop for Storage
         if self.enable_performance_metrics {
             println!("There were {} insertions into the protection set.", self.protection_set.borrow().number_of_insertions());
             println!("There were at most {} root variables.", self.protection_set.borrow().maximum_size());
-            println!("There were at most {} nodes.", self.table.capacity());
+            println!("There were at most {} nodes.", self.table.borrow().capacity());
         }
     }
 }
@@ -363,6 +344,8 @@ fn mark_node(table: &mut [Node], stack: &mut Vec<usize>, root: usize)
 #[cfg(test)]
 mod tests
 {
+    use std::collections::hash_map::DefaultHasher;
+
     use super::*;
     use crate::test_utility::*;
     use crate::operations::singleton;
@@ -401,5 +384,26 @@ mod tests
         }
 
         storage.garbage_collect();
+    }
+    
+    #[test]
+    fn test_hashing()
+    {        
+        let mut storage = Storage::new();   
+        
+        let set = random_vector_set(32, 10, 10);    
+        let ldd = from_iter(&mut storage, set.iter());
+        let ldd2 = from_iter(&mut storage, set.iter());
+
+        let mut hasher = DefaultHasher::new();
+        ldd.hash(&mut hasher);
+        let left = hasher.finish();
+
+        let mut hasher = DefaultHasher::new();
+        ldd2.hash(&mut hasher);
+        let right = hasher.finish();
+        
+        assert_eq!(ldd, ldd2, "Must be equal");
+        assert_eq!(left, right, "Must be equal");
     }
 }

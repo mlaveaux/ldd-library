@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use crate::Node;
 
 /// Every Ldd points to its root node in the Storage instance for maximal
 /// sharing. These Ldd instances can only be created from the storage.
@@ -12,14 +13,15 @@ pub struct Ldd
     index: usize, // Reference in the node table.
     root: usize, // Index in the root set.
     protection_set: Rc<RefCell<ProtectionSet>>,
+    table: Rc<RefCell<Vec<Node>>>,
 }
 
 impl Ldd
 {
-    pub fn new(protection_set: &Rc<RefCell<ProtectionSet>>, index: usize) -> Ldd
+    pub fn new(protection_set: &Rc<RefCell<ProtectionSet>>, table: &Rc<RefCell<Vec<Node>>>, index: usize) -> Ldd
     {
         let root = protection_set.borrow_mut().protect(index);
-        Ldd { protection_set: Rc::clone(protection_set), index, root }
+        Ldd { protection_set: Rc::clone(protection_set), table: Rc::clone(table), index, root }
     }
 
     pub fn index(&self) -> usize
@@ -38,7 +40,7 @@ impl Clone for Ldd
 {
     fn clone(&self) -> Self
     {
-        Ldd::new(&self.protection_set, self.index())
+        Ldd::new(&self.protection_set, &self.table, self.index())
     }
 }
 
@@ -50,12 +52,48 @@ impl Drop for Ldd
     }
 }
 
+pub fn equals(left: usize, right: usize, table: &Vec<Node>) -> bool
+{        
+    if left == right
+    {
+        true
+    }
+    else if left == 0 || left == 1 || right == 0 || right == 1
+    {
+        left == right
+    }
+    else
+    {
+        let left = &table[left];
+        let right = &table[right];
+
+        left.value == right.value && equals(left.down, right.down, &table) && equals(left.right, right.right, &table)
+    }
+}
+
+pub fn hash<H: Hasher>(state: &mut H, index: usize, table: &Vec<Node>)
+{
+    let node = &table[index];
+
+    if index == 0 || index == 1
+    {        
+        node.value.hash(state);
+    }
+    else
+    {
+        node.value.hash(state);
+        hash(state, node.down, table);
+        hash(state, node.right, table);
+    }
+}
+
+
 impl PartialEq for Ldd
 {
     fn eq(&self, other: &Self) -> bool
     {
-        debug_assert!(Rc::ptr_eq(&self.protection_set, &other.protection_set), "Both LDDs should refer to the same storage."); 
-        self.index() == other.index()
+        debug_assert!(Rc::ptr_eq(&self.protection_set, &other.protection_set), "Both LDDs should refer to the same protection set.");
+        equals(self.index, other.index, &self.table.borrow()) 
     }
 }
 
