@@ -12,11 +12,14 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: [macos-latest, ubuntu-latest, windows-latest]
+    strategy:
+      fail-fast: false
+      matrix:      
+        os: [ubuntu-20.04, macos-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Build
       run: cargo build --verbose
 
