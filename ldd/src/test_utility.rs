@@ -78,12 +78,11 @@ pub fn print_left(storage: &Storage, left: &Ldd, right: &Ldd) -> bool
 /// Prints the differences in contained vectors between two LDDs.
 pub fn print_differences(storage: &Storage, left: &Ldd, right: &Ldd)
 {
-    //eprintln!("Vectors contained in {:?}, but not in {:?}:", left, right);
-    let left_different = print_left(&storage, left, right);
+    // eprintln!("Vectors contained in {:?}, but not in {:?}:", left, right);
+    print_left(&storage, left, right);
     
-    //eprintln!("Vectors contained in {}, but not in {}:", right, left);
-    let right_different = print_left(&storage, right, left);
-    
+    // eprintln!("Vectors contained in {}, but not in {}:", right, left);
+    print_left(&storage, right, left);    
 }
 
 /// Returns project(vector, proj), see [project]. Requires proj to be sorted.
