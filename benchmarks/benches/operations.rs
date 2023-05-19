@@ -22,7 +22,7 @@ pub fn random_sorted_vector(length: usize, max_value: Value) -> Vec<Value>
     use rand::prelude::IteratorRandom;
 
     let mut rng = rand::thread_rng(); 
-    let mut result = (0..max_value).choose_multiple(&mut rng, length as usize);
+    let mut result = (0..max_value).choose_multiple(&mut rng, length);
     result.sort();
     result
 }

@@ -464,7 +464,7 @@ mod tests
         // All elements in the set should be contained in the ldd.
         for expected in &set
         {
-            assert!(element_of(&storage, &expected, &ldd), "Did not find expected vector in ldd");
+            assert!(element_of(&storage, expected, &ldd), "Did not find expected vector in ldd");
         }
 
         // No shorter vectors should be contained in the ldd (try several times).
@@ -667,8 +667,8 @@ mod tests
                 'next: for rel in relation.iter()
                 {
                     let mut value = x.clone(); // The resulting vector.
-                    let x_prime = project_vector(&rel, &read_rel_proj);
-                    let y_prime = project_vector(&rel, &write_rel_proj);
+                    let x_prime = project_vector(rel, &read_rel_proj);
+                    let y_prime = project_vector(rel, &write_rel_proj);
 
                     // Ensure that project(x, read_proj) = x'
                     for (i, r) in read_proj.iter().enumerate()

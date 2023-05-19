@@ -24,7 +24,7 @@ pub fn random_sorted_vector(length: usize, max_value: Value) -> Vec<Value>
     use rand::prelude::IteratorRandom;
 
     let mut rng = rand::thread_rng(); 
-    let mut result = (0..max_value).choose_multiple(&mut rng, length as usize);
+    let mut result = (0..max_value).choose_multiple(&mut rng, length);
     result.sort();
     result
 }
@@ -63,9 +63,9 @@ pub fn print_left(storage: &Storage, left: &Ldd, right: &Ldd) -> bool
 {
     let mut result = true;
 
-    for element in iter(&storage, &left)
+    for element in iter(storage, left)
     {
-        if !element_of(&storage, &element, &right)
+        if !element_of(storage, &element, right)
         {
             result = false;
             eprintln!("{:?}", element);
@@ -79,10 +79,10 @@ pub fn print_left(storage: &Storage, left: &Ldd, right: &Ldd) -> bool
 pub fn print_differences(storage: &Storage, left: &Ldd, right: &Ldd)
 {
     // eprintln!("Vectors contained in {:?}, but not in {:?}:", left, right);
-    print_left(&storage, left, right);
+    print_left(storage, left, right);
     
     // eprintln!("Vectors contained in {}, but not in {}:", right, left);
-    print_left(&storage, right, left);    
+    print_left(storage, right, left);    
 }
 
 /// Returns project(vector, proj), see [project]. Requires proj to be sorted.
