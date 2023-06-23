@@ -6,6 +6,7 @@ incremental = true
 debug = true
 
 [workspace]
+resolver = "2"
 members = [
     "examples/*",
     "benchmarks",
