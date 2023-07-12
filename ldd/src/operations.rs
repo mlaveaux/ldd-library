@@ -329,6 +329,26 @@ pub fn union(storage: &mut Storage, a: LddRef, b: LddRef) -> Ldd {
     }
 }
 
+/// Interleave the vectors of two equal height ldds.
+pub fn merge(storage: &mut Storage, a: LddRef, b: LddRef) -> Ldd {
+    if a == *storage.empty_vector() {
+        storage.protect(b)
+    } else if b == *storage.empty_vector() {
+        storage.protect(a)
+    } else if a == *storage.empty_set() || b == *storage.empty_set() {
+        storage.empty_set().clone()
+    } else {
+        cache_binary_op(storage, BinaryOperator::Merge, a, b, |storage, a, b| {
+            let DataRef(value, down, right) = storage.get_ref(a.borrow());
+
+            let down_result = merge(storage, b.borrow(), down);
+            let right_result = merge(storage, right, b);
+
+            storage.insert(value, down_result.borrow(), right_result.borrow())
+        })
+    }
+}
+
 /// Appends the given value to every vector in the set represented by the given ldd.
 pub fn append(storage: &mut Storage, ldd: LddRef, value: Value) -> Ldd {
     if ldd == *storage.empty_set() {
@@ -475,6 +495,42 @@ mod tests {
         let a = from_iter(&mut storage, set_a.iter());
         let b = from_iter(&mut storage, set_b.iter());
         let result = union(&mut storage, a.borrow(), b.borrow());
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn random_merge() {
+        let mut storage = Storage::new();
+
+        let set_a = random_vector_set(32, 10, 10);
+        let set_b = random_vector_set(32, 10, 10);
+
+        // Compute the interleave explicitly.
+        fn interleave(a: &Vec<u32>, b: &Vec<u32>) -> Vec<u32> {
+            let mut result = vec![];
+
+            let mut iter = b.iter();
+            for value in a {
+                result.push(*value);
+                result.push(*iter.next().unwrap());
+            }
+
+            result
+        }
+
+        let mut set_result = HashSet::<Vec<u32>>::new();
+        for a in &set_a {
+            for b in &set_b {
+                set_result.insert(interleave(a, b));
+            }
+        }
+
+        let expected = from_iter(&mut storage, set_result.iter());
+
+        let a = from_iter(&mut storage, set_a.iter());
+        let b = from_iter(&mut storage, set_b.iter());
+        let result: Ldd = merge(&mut storage, a.borrow(), b.borrow());
 
         assert_eq!(result, expected);
     }

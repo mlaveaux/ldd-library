@@ -29,7 +29,7 @@ impl OperationCache
         OperationCache {
             protection_set,
             caches1: vec![Cache::new()],
-            caches2: vec![Cache::new(); 2],
+            caches2: vec![Cache::new(); 3],
             caches3: vec![Cache::new()],
         }
     }
@@ -106,7 +106,8 @@ impl OperationCache
     {
         match operator {
             BinaryOperator::Union => &mut self.caches2[0],
-            BinaryOperator::Minus => &mut self.caches2[1]
+            BinaryOperator::Merge => &mut self.caches2[1],
+            BinaryOperator::Minus => &mut self.caches2[2]
         }
     }
 
@@ -242,6 +243,7 @@ pub enum UnaryFunction
 pub enum BinaryOperator
 {
     Union,
+    Merge,
     Minus,
 }
 
