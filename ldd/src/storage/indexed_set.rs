@@ -42,7 +42,7 @@ impl<T> IndexedSet<T> {
     }
 
     pub fn len(&self) -> usize {
-        return self.table.len();
+        self.table.len()
     }
 
     pub fn get(&self, index: usize) -> Option<&T> {
@@ -69,11 +69,7 @@ impl<T> IndexedSet<T> {
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
         let iter = self.table.iter_mut().filter(|element| {
-                if let Entry::Filled(_) = element {
-                    true
-                } else {
-                    false
-                }
+                matches!(element, Entry::Filled(_))
             }).map(|element| {
                 cast!(element, Entry::Filled)                
             }).enumerate();
