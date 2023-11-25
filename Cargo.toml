@@ -12,3 +12,14 @@ members = [
     "benchmarks",
     "ldd",
 ]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.60.0"
+
+[workspace.dependencies]
+criterion = { version = "0.5" }
+rand = "0.8"
+rustc-hash = "1.1"
+ahash = "0.8"
+static_assertions = "1.1"
