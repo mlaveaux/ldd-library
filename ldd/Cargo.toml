@@ -8,6 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 rand.workspace = true
-rustc-hash.workspace = true
-ahash.workspace = true
-static_assertions.workspace = true
+rustc-hash = "1.1"
+ahash = "0.8"
+static_assertions = "1.1"
