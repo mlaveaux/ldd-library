@@ -52,7 +52,7 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
     for vector in iter
     {
         let single = singleton(storage, vector);
-        result = union(storage, result.borrow(), single.borrow());
+        result = union(storage, &result, &single);
     }
 
     result

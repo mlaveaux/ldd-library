@@ -50,7 +50,7 @@ pub fn from_iter<'a, I>(storage: &mut Storage, iter: I) -> Ldd
     for vector in iter
     {
         let single = singleton(storage, vector);
-        result = union(storage, result.borrow(), single.borrow());
+        result = union(storage, &result, &single);
     }
 
     result
@@ -71,7 +71,7 @@ pub fn criterion_benchmark(c: &mut Criterion)
                 let a = from_iter(&mut storage, set_a.iter());
                 let b = from_iter(&mut storage, set_b.iter());
             
-                black_box(union(&mut storage, a.borrow(), b.borrow()));
+                black_box(union(&mut storage, &a, &b));
             })
         });
 
@@ -89,7 +89,7 @@ pub fn criterion_benchmark(c: &mut Criterion)
                 let a = from_iter(&mut storage, set_a.iter());
                 let b = from_iter(&mut storage, set_b.iter());
             
-                black_box(minus(&mut storage, a.borrow(), b.borrow()));
+                black_box(minus(&mut storage, &a, &b));
             })
         });
         
@@ -113,7 +113,7 @@ pub fn criterion_benchmark(c: &mut Criterion)
                 let rel = from_iter(&mut storage, relation.iter());
 
                 let meta = compute_meta(&mut storage, &read_proj, &write_proj);
-                black_box(relational_product(&mut storage, ldd.borrow(), rel.borrow(), meta.borrow()));
+                black_box(relational_product(&mut storage, &ldd, &rel, &meta));
             })
         });
 }

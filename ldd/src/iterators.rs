@@ -46,7 +46,7 @@ impl Iterator for IterRight<'_>
         else
         {
             // Progress to the right LDD.
-            let Data(value, down, right) = self.storage.get(self.current.borrow());       
+            let Data(value, down, right) = self.storage.get(&self.current);       
             self.current = right.clone();
             Some(Data(value, down, right))
         }
@@ -75,7 +75,7 @@ impl Iterator for Iter<'_>
                 None => return None,
             };
 
-            let Data(value, down, _) = self.storage.get(current.borrow());
+            let Data(value, down, _) = self.storage.get(&current);
             self.vector.push(value);
             if down == *self.storage.empty_vector()
             {
@@ -92,7 +92,7 @@ impl Iterator for Iter<'_>
         while let Some(current) = self.stack.pop() 
         {
             self.vector.pop();
-            let Data(_, _, right) = self.storage.get(current.borrow());
+            let Data(_, _, right) = self.storage.get(&current);
 
             if right != *self.storage.empty_set()
             {

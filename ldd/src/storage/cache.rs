@@ -4,7 +4,7 @@ use ahash::RandomState;
 
 use crate::{Storage, Ldd, LddRef};
 
-use super::ldd::ProtectionSet;
+use super::protection_set::ProtectionSet;
 
 /// The operation cache can significantly speed up operations by caching
 /// intermediate results. This is necessary since the maximal sharing means that
@@ -16,7 +16,7 @@ use super::ldd::ProtectionSet;
 /// the value of [UnaryFunction], [BinaryOperator] or [TernaryOperator].
 pub struct OperationCache
 {
-    protection_set: Rc<RefCell<ProtectionSet>>,
+    protection_set: Rc<RefCell<ProtectionSet<usize>>>,
     caches1: Vec<Cache<usize, usize>>,
     caches2: Vec<Cache<(usize, usize), usize>>,
     caches3: Vec<Cache<(usize, usize, usize), usize>>,
@@ -24,7 +24,7 @@ pub struct OperationCache
 
 impl OperationCache
 {
-    pub fn new(protection_set: Rc<RefCell<ProtectionSet>>) -> OperationCache
+    pub fn new(protection_set: Rc<RefCell<ProtectionSet<usize>>>) -> OperationCache
     {
         OperationCache {
             protection_set,
@@ -254,8 +254,8 @@ pub enum TernaryOperator
 }
 
 /// Implements an operation cache for a unary LDD operator.
-pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a: LddRef, f: F) -> usize
-    where F: Fn(&mut Storage, LddRef) -> usize
+pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a: &LddRef, f: F) -> usize
+    where F: Fn(&mut Storage, &LddRef) -> usize
 {
     let key = a.index();
     if let Some(result) = storage.operation_cache().get_cache1(&operator).get(&key) 
@@ -271,8 +271,8 @@ pub fn cache_unary_function<F>(storage: &mut Storage, operator: UnaryFunction, a
 }
 
 /// Implements an operation cache for a binary LDD operator.
-pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: LddRef, b: LddRef, f: F) -> Ldd
-    where F: Fn(&mut Storage, LddRef, LddRef) -> Ldd
+pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: &LddRef, b: &LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, &LddRef, &LddRef) -> Ldd
 {
     let key = (a.index(), b.index());
     if let Some(result) = storage.operation_cache().get_cache2(&operator).get(&key) 
@@ -290,8 +290,8 @@ pub fn cache_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: Ld
 
 /// Implements an operation cache for a commutative binary LDD operator, i.e.,
 /// an operator f such that f(a,b) = f(b,a) for all LDD a and b.
-pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: LddRef, b: LddRef, f: F) -> Ldd
-    where F: Fn(&mut Storage, LddRef, LddRef) -> Ldd
+pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, a: &LddRef, b:& LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, &LddRef, &LddRef) -> Ldd
 {
     // Reorder the inputs to improve caching behaviour (can potentially half the cache size)
     if a.index() < b.index() {
@@ -302,8 +302,8 @@ pub fn cache_comm_binary_op<F>(storage: &mut Storage, operator: BinaryOperator, 
 }
 
 /// Implements an operation cache for a terniary LDD operator.
-pub fn cache_terniary_op<F>(storage: &mut Storage, operator: TernaryOperator, a: LddRef, b: LddRef, c: LddRef, f: F) -> Ldd
-    where F: Fn(&mut Storage, LddRef, LddRef, LddRef) -> Ldd
+pub fn cache_terniary_op<F>(storage: &mut Storage, operator: TernaryOperator, a: &LddRef, b: &LddRef, c: &LddRef, f: F) -> Ldd
+    where F: Fn(&mut Storage, &LddRef, &LddRef, &LddRef) -> Ldd
 {
     let key = (a.index(), b.index(), c.index());
     if let Some(result) = storage.operation_cache().get_cache3(&operator).get(&key) 

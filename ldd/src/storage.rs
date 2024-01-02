@@ -6,12 +6,13 @@ use crate::operations::height;
 
 mod cache;
 mod indexed_set;
+mod protection_set;
 mod ldd;
 
 pub use self::cache::*;
 use self::indexed_set::IndexedSet;
 pub use self::ldd::{Ldd, LddRef};
-use self::ldd::{ProtectionSet};
+use self::protection_set::ProtectionSet;
 
 pub type Value = u32;
 
@@ -74,7 +75,7 @@ pub struct DataRef<'a>(pub Value, pub LddRef<'a>, pub LddRef<'a>);
 /// indices in the node table match.
 pub struct Storage
 {
-    protection_set: Rc<RefCell<ProtectionSet>>, // Every Ldd points to the underlying protection set.
+    protection_set: Rc<RefCell<ProtectionSet<usize>>>, // Every Ldd points to the underlying protection set.
     nodes: IndexedSet<Node>,
     cache: OperationCache,
 
@@ -121,19 +122,19 @@ impl Storage
     }
 
     /// Create a new LDD node(value, down, right)
-    pub fn insert(&mut self, value: Value, down: LddRef, right: LddRef) -> Ldd
+    pub fn insert(&mut self, value: Value, down: &LddRef, right: &LddRef) -> Ldd
     {
         // These invariants ensure that the result is a valid LDD.
-        debug_assert_ne!(down, *self.empty_set(), "down node can never be the empty set.");
-        debug_assert_ne!(right, *self.empty_vector(), "right node can never be the empty vector."); 
+        debug_assert_ne!(down, self.empty_set(), "down node can never be the empty set.");
+        debug_assert_ne!(right, self.empty_vector(), "right node can never be the empty vector."); 
         debug_assert!(down.index() < self.nodes.len(), "down node not in table.");
         debug_assert!(right.index() < self.nodes.len(), "right not not in table.");
 
-        if right != *self.empty_set()
+        if right != self.empty_set()
         {
-            debug_assert_eq!(height(self, down.borrow()) + 1, height(self, right.borrow()), 
+            debug_assert_eq!(height(self, down) + 1, height(self, right), 
                 "height of node {} should match the right node {} height.", down.index(), right.index());
-            debug_assert!(value < self.value(right.borrow()), "value should be less than right node value.");
+            debug_assert!(value < self.value(right), "value should be less than right node value.");
         }
         
         if self.count_until_collection == 0 
@@ -151,7 +152,7 @@ impl Storage
     }
 
     /// Upgrade an [LddRef] to a protected [Ldd] instance.
-    pub fn protect(&mut self, ldd: LddRef) -> Ldd
+    pub fn protect(&mut self, ldd: &LddRef) -> Ldd
     {
         Ldd::new(&self.protection_set, ldd.index())
     }
@@ -166,9 +167,9 @@ impl Storage
 
         // Mark all nodes that are (indirect) children of nodes with positive reference count.
         let mut stack: Vec<usize> = Vec::new();
-        for root in self.protection_set.borrow().iter()
+        for (root, _index) in self.protection_set.borrow().iter()
         {
-            mark_node(&mut self.nodes, &mut stack, root);
+            mark_node(&mut self.nodes, &mut stack, *root);
         }
         
         // Collect all garbage nodes.
@@ -224,50 +225,50 @@ impl Storage
     }
 
     /// The value of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn value(&self, ldd: LddRef) -> Value
+    pub fn value(&self, ldd: &LddRef) -> Value
     {
-        self.verify_ldd(ldd.borrow());
+        self.verify_ldd(ldd);
         let node = &self.nodes[ldd.index()];
         node.value
     }
 
     /// The down of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn down(&self, ldd: LddRef) -> Ldd
+    pub fn down(&self, ldd: &LddRef) -> Ldd
     {
-        self.verify_ldd(ldd.borrow());
+        self.verify_ldd(ldd);
         let node = &self.nodes[ldd.index()];
         Ldd::new(&self.protection_set, node.down)
     }
 
     /// The right of an LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn right(&self, ldd: LddRef) -> Ldd
+    pub fn right(&self, ldd: &LddRef) -> Ldd
     {
-        self.verify_ldd(ldd.borrow());
+        self.verify_ldd(ldd);
         let node = &self.nodes[ldd.index()];
         Ldd::new(&self.protection_set, node.right)
     }
 
     /// Returns a Data tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn get(&self, ldd: LddRef) -> Data
+    pub fn get(&self, ldd: &LddRef) -> Data
     {
-        self.verify_ldd(ldd.borrow());     
+        self.verify_ldd(ldd);     
         let node = &self.nodes[ldd.index()];
         Data(node.value, Ldd::new(&self.protection_set, node.down), Ldd::new(&self.protection_set, node.right))
     }
 
     /// Returns a DataRef tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn get_ref<'a>(&self, ldd: LddRef<'a>) -> DataRef<'a>
+    pub fn get_ref<'a>(&self, ldd: &LddRef<'a>) -> DataRef<'a>
     {
-        self.verify_ldd(ldd.borrow());     
+        self.verify_ldd(ldd);     
         let node = &self.nodes[ldd.index()];
         DataRef(node.value, LddRef::new(node.down), LddRef::new(node.right))
     }
 
     // Asserts whether the given ldd is valid.
-    fn verify_ldd(&self, ldd: LddRef)
+    fn verify_ldd(&self, ldd: &LddRef)
     {    
-        debug_assert_ne!(&ldd, self.empty_set(), "Cannot inspect empty set.");
-        debug_assert_ne!(&ldd, self.empty_vector(), "Cannot inspect empty vector.");  
+        debug_assert_ne!(ldd, self.empty_set(), "Cannot inspect empty set.");
+        debug_assert_ne!(ldd, self.empty_vector(), "Cannot inspect empty vector.");  
         debug_assert!(self.nodes.get(ldd.index()).is_some(), "Node {} should not have been garbage collected", ldd.index());
     }
 }
@@ -330,7 +331,7 @@ mod tests
             let vector = random_vector(10, 10);
             let ldd = singleton(&mut storage, &vector);
 
-            _child = storage.get(ldd.borrow()).1;
+            _child = storage.get(&ldd).1;
             storage.garbage_collect();
         }
 
@@ -348,7 +349,7 @@ mod tests
             let vector = random_vector_set(2000, 10, 2);
             let ldd = from_iter(&mut storage, vector.iter());
 
-            _child = storage.get(storage.get(ldd.borrow()).1.borrow()).1;
+            _child = storage.get(&storage.get(&ldd).1).1;
             storage.garbage_collect();
         }
 

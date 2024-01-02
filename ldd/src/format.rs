@@ -102,7 +102,7 @@ fn print_node(storage: &Storage, f: &mut impl Write, marked: &mut HashSet<Ldd>, 
         {
             if down != *storage.empty_set() && down != *storage.empty_vector()
             {
-                writeln!(f, "{}:{} -> {}:{};", ldd.index(), value, down.index(), storage.get_ref(down.borrow()).0)?;
+                writeln!(f, "{}:{} -> {}:{};", ldd.index(), value, down.index(), storage.get_ref(&down).0)?;
             }
         }
         
