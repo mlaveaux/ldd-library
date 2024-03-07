@@ -89,7 +89,17 @@ impl Hash for Ldd
 impl Eq for Ldd {}
 
 /// The LddRef is a reference to an existing [Ldd] instance. This can be used to
-/// avoid explicit protections that are performed when creating an [Ldd] instance.
+/// avoid explicit protections that are performed when creating an [Ldd]
+/// instance.
+/// 
+/// # Implementation notes
+/// 
+/// It is important to note that the lifetime carried by an LddRef is only used
+/// to enforce lifetime constraints in several places, in a similar way as used
+/// for mutex guards or iterators. The lifetime should *not* be used to derive
+/// lifetimes of return values and instead these should be derived from `self`.
+/// If this is implemented correctly in the internal implementation then the
+/// LddRef can never be misused.
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub struct LddRef<'a>
 {
@@ -111,7 +121,7 @@ impl<'a> LddRef<'a>
     }
     
     /// Returns an LddRef with the same lifetime as itself.
-    pub fn borrow(&self) -> LddRef
+    pub fn borrow(&self) -> LddRef<'_>
     {
         LddRef::new(self.index())        
     }

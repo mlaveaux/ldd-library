@@ -350,17 +350,17 @@ pub fn merge(storage: &mut Storage, a: &LddRef, b: &LddRef) -> Ldd {
 }
 
 /// Appends the given value to every vector in the set represented by the given ldd.
-pub fn append(storage: &mut Storage, ldd: LddRef, value: Value) -> Ldd {
-    if ldd == *storage.empty_set() {
+pub fn append(storage: &mut Storage, ldd: &LddRef, value: Value) -> Ldd {
+    if ldd == storage.empty_set() {
         storage.empty_set().clone()
-    } else if ldd == *storage.empty_vector() {
+    } else if ldd == storage.empty_vector() {
         singleton(storage, &[value])
     } else {
         // Traverse the ldd.
         let DataRef(val, down, right) = storage.get_ref(&ldd);
 
-        let down_result = append(storage, down.borrow(), value);
-        let right_result = append(storage, right.borrow(), value);
+        let down_result = append(storage, &down, value);
+        let right_result = append(storage, &right, value);
 
         storage.insert(val, &down_result, &right_result)
     }
@@ -771,7 +771,7 @@ mod tests {
 
         let set = random_vector_set(32, 10, 10);
         let ldd = from_iter(&mut storage, set.iter());
-        let result = append(&mut storage, ldd.borrow(), 0);
+        let result = append(&mut storage, &ldd, 0);
 
         let mut expected_result: HashSet<Vec<Value>> = HashSet::new();
         for element in &set {

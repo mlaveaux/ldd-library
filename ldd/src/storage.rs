@@ -257,7 +257,7 @@ impl Storage
     }
 
     /// Returns a DataRef tuple for the given LDD node(value, down, right). Note, ldd cannot be 'true' or 'false.
-    pub fn get_ref<'a>(&self, ldd: &LddRef<'a>) -> DataRef<'a>
+    pub fn get_ref<'a>(&self, ldd: &'a LddRef) -> DataRef<'a>
     {
         self.verify_ldd(ldd);     
         let node = &self.nodes[ldd.index()];
