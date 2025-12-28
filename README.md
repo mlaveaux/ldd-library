@@ -1,4 +1,4 @@
- > ⚠️ **important** This repository is archived, and its developement is continued in the [merc](https://github.com/MERCorg/merc) repository. In the future an LDD implementation will also added to the [OxiDD](https://oxidd.net/) project.
+ > ⚠️ **important** This repository is archived, and its development is continued in the [merc](https://github.com/MERCorg/merc) repository. In the future an LDD implementation will also added to the [OxiDD](https://oxidd.net/) project.
 
 # Description
 
