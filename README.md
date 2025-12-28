@@ -1,3 +1,5 @@
+ > ⚠️ **important** This repository is archived, and its developement is continued in the [merc](https://github.com/MERCorg/merc) repository. In the future an LDD implementation will also added to the [OxiDD](https://oxidd.net/) project.
+
 # Description
 
 A library to create and manipulate so called list decision diagrams, also abbreviated as LDDs, that is implemented in Rust. List decision diagrams are data structures that can efficiently represent sets of equal length vectors over natural numbers. For these data structures we can also efficiently implement standard set operations as well as several specialised operations for the purpose of graph exploration. For detailed documentation use `cargo doc --open` and visit the page for the `ldd` crate, which contains the library implementation. Compiling the library requires at least rustc version 1.58.0 and we use 2021 edition rust.
